@@ -1,0 +1,19 @@
+.main-menu { width: min(100%, 560px); margin: auto; padding: 34px 24px 30px; text-align: center; color: var(--ivory); }
+.menu-seal { color: var(--gold); font-size: 32px; margin-bottom: 14px; }
+.menu-title { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(92px, 20vw, 152px); line-height: .9; font-weight: 400; letter-spacing: -.065em; margin: 25px 0 24px; text-shadow: 0 6px 22px #0003; }
+.menu-title span { display: block; font: 500 12px/1.3 system-ui, sans-serif; letter-spacing: .35em; text-transform: uppercase; margin-top: 18px; color: var(--gold); }
+.menu-intro { font-family: Georgia, 'Times New Roman', serif; font-size: 23px; line-height: 1.5; color: var(--ivory); margin-bottom: 28px; }
+.menu-actions { display: grid; gap: 12px; margin: 0 auto 30px; max-width: 340px; }
+.menu-actions .button { display: flex; justify-content: space-between; align-items: center; }
+.menu-win-count { font-size: 12px; opacity: .7; font-weight: 400; }
+.menu-rules { border-top: 1px solid #cfb77b42; border-bottom: 1px solid #cfb77b42; padding: 24px 8px 20px; }
+.menu-rules p:not(.eyebrow) { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 12px 0; }
+.menu-rules strong { color: var(--ivory); }
+.menu-operations { color: var(--gold); font-family: Georgia, serif; font-size: 27px; word-spacing: 22px; }
+.menu-operations span { opacity: .65; }
+.card-mode-setting { display: flex; text-align: left; justify-content: space-between; gap: 18px; align-items: center; max-width: 360px; margin: 24px auto; cursor: pointer; min-height: 44px; }
+.card-mode-setting strong { display: block; font-size: 13px; font-weight: 500; }
+.card-mode-setting small { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; }
+.card-mode-setting input { width: 23px; height: 23px; accent-color: var(--gold); flex: 0 0 auto; cursor: pointer; }
+.menu-footnote { color: var(--muted); opacity: .8; font-size: 11px; line-height: 1.7; }
+@media (max-width: 480px) { .main-menu { padding-top: 22px; } .menu-title { margin-top: 20px; } .menu-intro { font-size: 21px; } }
