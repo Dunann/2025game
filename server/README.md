@@ -2,6 +2,8 @@
 
 Run the TypeScript server with `npx tsx server/index.ts`. It listens on `127.0.0.1:3001` by default. The frontend development server should proxy `/api` to this address while preserving the incoming host, or explicitly list the frontend origin in `ALLOWED_ORIGINS`.
 
+Use `npm run dev` for both services with coordinated shutdown. The API closes its database on Ctrl+C or the runner's IPC shutdown request; backend edits require a restart. An adjacent `.lock` file prevents concurrent application instances from opening the same local database. Startup reports PostgreSQL diagnostics on failure. Preserve a failing database directory before attempting recovery; selecting a new `PGLITE_DATA_DIR` creates separate records and does not recover existing statistics.
+
 Environment variables:
 
 | Name | Behavior |

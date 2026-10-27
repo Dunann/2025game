@@ -204,6 +204,7 @@ it('persists PostgreSQL data on disk and reopens without reapplying migrations',
   let db: Database | undefined;
   try {
     db = await createDatabase({ dataDir });
+    await expect(createDatabase({ dataDir })).rejects.toThrow('already open');
     await db.query('INSERT INTO players(id, created_at) VALUES ($1, $2)', ['persistent-player', 100]);
     await db.close(); db = undefined;
     db = await createDatabase({ dataDir });

@@ -1,7 +1,8 @@
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import pg from 'pg';
+import { lockDatabase } from './database-lock';
 
 export interface QueryResult { rows: Record<string, unknown>[] }
 export interface Transaction { query(sql: string, parameters?: unknown[]): Promise<QueryResult> }
@@ -66,8 +67,25 @@ export async function createDatabase(options: { connectionString?: string; dataD
     // PGlite creates its database files, but its Node filesystem needs the parent
     // hierarchy to exist on a fresh checkout.
     if (dataDir !== 'memory://') await mkdir(dataDir, { recursive: true });
-    const engine = new PGlite(dataDir);
-    await engine.waitReady;
+    const releaseLock = dataDir === 'memory://' ? () => {} : lockDatabase(await realpath(dataDir));
+    const startupMessages: string[] = [];
+    let starting = true;
+    const engine = new PGlite(dataDir, {
+      onStderr: message => {
+        if (!starting) return false;
+        startupMessages.push(message);
+        if (startupMessages.length > 12) startupMessages.shift();
+        return true;
+      },
+    });
+    try {
+      await engine.waitReady;
+      starting = false;
+    } catch (error) {
+      releaseLock();
+      const detail = startupMessages.join('\n') || (error instanceof Error ? error.message : String(error));
+      throw new Error(`Could not open local database at "${dataDir}".\n${detail}\nPreserve this directory before attempting recovery. PGLITE_DATA_DIR can select a separate development database.`);
+    }
     // PGlite shares one connection. Queue entire transactions and standalone queries together.
     let tail: Promise<unknown> = Promise.resolve();
     const queue = <T>(work: () => Promise<T>): Promise<T> => {
@@ -89,7 +107,7 @@ export async function createDatabase(options: { connectionString?: string; dataD
         const response = await tx.query(sql, parameters);
         return { rows: response.rows as Record<string, unknown>[] };
       } }))),
-      close: () => queue(() => engine.close()),
+      close: () => queue(async () => { await engine.close(); releaseLock(); }),
     };
   }
   try { await migrate(db); } catch (error) { await db.close(); throw error; }

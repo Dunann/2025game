@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n api,web \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "vite --host 127.0.0.1 --port 5173 --strictPort",
-    "dev:api": "node --env-file-if-exists=.env --import tsx --watch server/index.ts",
+    "dev:api": "node --env-file-if-exists=.env --import tsx server/index.ts",
     "start": "node --env-file-if-exists=.env --import tsx server/index.ts",
     "build": "tsc -b && tsc -p server/tsconfig.json && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5173 --strictPort",

@@ -64,7 +64,7 @@ npm run build
 
 The build checks client and server TypeScript and produces the website in `dist/`. Tests cover exact arithmetic, complete winning hands, deck identity, storage validation, statistics windows, API requests, ordered retry behavior, and real database/HTTP integration with PGlite.
 
-Separate development commands are `npm run dev:web` and `npm run dev:api`. `npm run preview` serves the built frontend through Vite; it still needs the API running separately. `npm start` runs the backend without watch mode.
+Separate development commands are `npm run dev:web` and `npm run dev:api`. Frontend changes reload automatically; restart after backend changes. Stop `npm run dev` with Ctrl+C and wait for shutdown to finish: the runner closes the API database before stopping the frontend. Avoid forced process termination while the database is open. `npm run preview` serves the built frontend through Vite; it still needs the API running separately. `npm start` runs the backend without watch mode.
 
 ## Future online deployment
 

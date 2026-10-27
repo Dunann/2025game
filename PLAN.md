@@ -238,6 +238,13 @@ These are the targeted implementation checks for the authorized build.
 
 ## Deferred scope
 
+### Local connection recovery (October 27, 2026)
+
+- Diagnosed the original development database startup failure on a copy: PostgreSQL reported an invalid checkpoint record. Preserved `.data/postgres`; the user authorized a separate fresh database, selected through ignored local `.env`. Previous statistics have not been recovered.
+- Replaced the Windows force-killing development runner with an IPC shutdown handshake that closes the API database before stopping Vite. Frontend HMR remains available; backend edits require a restart.
+- Added an application database lock to reject simultaneous local database opens, and readable startup diagnostics. No automatic checkpoint/WAL repair or database reset occurs.
+- Validation: production build and 15 backend integration tests passed, including duplicate-open rejection and disk reopening. A separate temporary-database runner check saved settings, shut down cleanly, restarted and verified persistence. Website proxy health and profile endpoints returned success using the fresh local database.
+
 Online accounts, cross-device login, leaderboards, multiplayer, daily challenges, hints, replay sharing, and additional operation sets are outside the proposed initial scope. Backend database persistence is now included.
 
 Guaranteed solvable deals are a desired future milestone. Evaluate a solver versus a curated or generated library of validated hands, validate each solution using the same exact arithmetic engine, and consider computation cost and hand diversity. Initial random deals must not be described as guaranteed solvable.
