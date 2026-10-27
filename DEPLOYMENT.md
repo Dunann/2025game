@@ -91,6 +91,19 @@ exists in Render's private environment settings. Initial setup attempts failed
 while transferring the URL; the endpoint and refreshed credential were corrected
 and verified before the successful deployment. Local statistics remain local.
 
+### Optional exponentiation update
+
+Commit `eb5cce6` is live in Render deployment `dep-dbghspuk1f9s738r3png`.
+Migration 003 preserves older power-enabled attempts and defaults new preferences
+off. Production verification passed for the default, saved opt-in, legacy record
+preservation, immutable run rules and served checkbox bundle. Local validation
+passed 188 tests, the production build and responsive browser checks.
+
+This update was deployed manually after the Git push did not start a deployment.
+Always verify Render's live commit; do not assume that a successful push alone
+updates the public site. Git provider authorization may be needed for automatic
+deployment from the current public repository connection.
+
 ## Limits and maintenance
 
 Render Free sleeps when idle, so the first visit can be slow. Neon Free has

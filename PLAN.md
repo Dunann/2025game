@@ -1,6 +1,6 @@
 # 2025 game implementation plan
 
-Status: live on Render Free + Neon Free. Optional exponentiation is implemented and checked locally with a lead and three reused workers; deployment verification follows the integration checkpoint.
+Status: live on Render Free + Neon Free. Optional exponentiation is implemented, checked locally and verified in production with a lead and three reused workers.
 
 ## Intended experience
 
@@ -15,7 +15,7 @@ The statistics screen shows wins, best winning time, the average time of the lat
 The latest request makes exponentiation an opt-in Game settings option, **off by
 default**. This section supersedes prior always-enabled/five-operation assumptions
 for new games. Implementation is authorized; the deployed version will change
-after integration checks pass.
+after integration checks pass. Commit `eb5cce6` is now deployed and verified.
 
 **Contracts and compatibility — lead first**
 
@@ -76,6 +76,8 @@ two-card G merge when on, separate Powers off/on statistics, and Standard 2025
 resetting the preference off. Both toolbar layouts fit 320px without horizontal
 overflow and all operation buttons exceed 44px width. Migration checks cover
 preservation of legacy outcomes and old clients during a rolling deployment.
+Production checks also passed for the new false default, saved opt-in, legacy
+enabled records, immutable run rules, and the updated checkbox asset bundle.
 
 ### Confirmed requirements
 
