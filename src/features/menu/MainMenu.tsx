@@ -1,4 +1,5 @@
 import type { Settings } from '../../types';
+import { RulesContent } from '../rules/RulesContent';
 import './menu.css';
 
 interface Props { settings: Settings; onSettingsChange: (settings: Settings) => void; onPlay: () => void; onStats: () => void; wins: number }
@@ -6,22 +7,20 @@ interface Props { settings: Settings; onSettingsChange: (settings: Settings) => 
 export function MainMenu({ settings, onSettingsChange, onPlay, onStats, wins }: Props) {
   return <section className="main-menu" aria-label="Main menu">
     <div className="menu-seal" aria-hidden="true">♠</div>
-    <p className="eyebrow">The numbers club</p>
     <h1 className="menu-title" tabIndex={-1}>2025<span>The card game</span></h1>
-    <p className="menu-intro">Eight cards. Five operations.<br />One number to make.</p>
     <div className="menu-actions">
-      <button className="button button-primary" onClick={onPlay}>Take a seat <span aria-hidden="true">↗</span></button>
-      <button className="button button-quiet" onClick={onStats}>Your statistics <span className="menu-win-count">{wins} {wins === 1 ? 'win' : 'wins'}</span></button>
+      <button className="button button-primary menu-play" onClick={onPlay}><span className="menu-play-suit" aria-hidden="true">♠</span><span>Take a seat</span><span className="menu-play-suit" aria-hidden="true">♠</span></button>
+      <button className="button menu-stats" onClick={onStats}><span className="menu-stats-label"><span className="menu-stats-chip" aria-hidden="true">♣</span>Your statistics</span><span className="menu-win-count">{wins} {wins === 1 ? 'win' : 'wins'}</span></button>
     </div>
-    <section className="menu-rules" aria-label="How to play">
-      <p className="eyebrow">A little arithmetic. A little ambition.</p>
-      <p>Select a card, choose an operation, then select another card. Combine all eight into exactly <strong>2025</strong>.</p>
-      <div className="menu-operations" aria-label="Addition, subtraction, multiplication, division and exponentiation">+ <span>−</span> × <span>÷</span> ^</div>
-    </section>
+    <details className="menu-rules">
+      <summary className="button button-quiet">Rules &amp; how to play<span className="menu-rules-toggle" aria-hidden="true">+</span></summary>
+      <div className="menu-rules-content">
+        <RulesContent />
+      </div>
+    </details>
     <label className="card-mode-setting">
       <span><strong>Playing card mode</strong><small>Display 1, 11, 12, 13 as A, J, Q, K</small></span>
       <input type="checkbox" checked={settings.playingCardMode} onChange={event => onSettingsChange({ ...settings, playingCardMode: event.target.checked })} />
     </label>
-    <p className="menu-footnote">Random deals. Every hand is a fresh challenge.<br />Some hands may have no solution.</p>
   </section>;
 }

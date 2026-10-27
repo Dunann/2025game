@@ -4,7 +4,7 @@ Status: first draft implemented and validated locally. Initial planning document
 
 ## Intended experience
 
-Open the website to a starting menu with Play, Stats, and access to the playing card display setting. Play begins a timed run with eight cards. Select a card, choose one of five operations at the bottom of the screen, then select a second card. Both operands disappear and one result card appears at a random available position. Win by combining all eight original cards into a single value of exactly 2025, or end the attempt using Give up.
+Open the website to a starting menu with Play, Stats, detailed expandable rules, and the playing card display setting. Play begins a timed run with eight cards. Select a card, an operation, then another card; alternatively select both cards first, then the operation. Both operands disappear and one result card appears at a random available position. Win by combining all eight original cards into a single value of exactly 2025, or end the attempt using Give up.
 
 The statistics screen shows wins, best winning time, the average time of the latest 20 successful runs, success rate, give-up count, and time until give up. Confirmed rules and proposed statistics definitions appear below.
 
@@ -14,7 +14,7 @@ The statistics screen shows wins, best winning time, the average time of the lat
 
 - A standalone website hosting the game, with a main menu, game screen, and statistics screen.
 - Eight distinct playing cards drawn from a deck, with values 1–13.
-- Merge exactly two different active cards through ordered clicks: first operand, operation, second operand.
+- Merge exactly two different active cards through either ordered sequence: first operand → operation → second operand, or first operand → second operand → operation. Border colors and labels identify operand order.
 - Include five operation buttons: addition, subtraction, multiplication, division, and exponentiation (`^`).
 - A win requires all eight original cards to be consumed into one final value of exactly 2025.
 - Use exact fractions with integer exponents for the initial version.
@@ -24,7 +24,7 @@ The statistics screen shows wins, best winning time, the average time of the lat
 - Include a Give up button and record time elapsed until giving up.
 - Track wins, best time, average time of the last 20 wins, success rate, and give-up statistics, with aggregation details proposed below.
 - Implement with the primary agent as lead and three workers after updating this plan.
-- Use a poker-table visual design with green felt, particles after successful merges, and a Restart button.
+- Use a poker-table visual design with green felt, particles after successful merges, larger display typography and consistent casino-plaque action buttons. Restart and New hand were removed by the latest user instruction; retain Undo and Give up during active play.
 
 ### Confirmed rule decisions
 
@@ -48,11 +48,11 @@ These defaults can be adjusted during implementation without changing the core p
 - Allow negative and fractional intermediate values. In exact mode use normalized numerator/denominator values with a positive denominator.
 - Reject division by zero, zero to a negative exponent, `0^0`, and noninteger exponents in exact mode. Define explicit magnitude and computation limits before implementing exponentiation so huge powers cannot freeze the page.
 - Use readable fraction formatting and expand long values through a detail view or accessible label. The underlying value stays exact. Face labels apply to exact rank values, including a merged result with that value.
-- Clicking the selected card again clears selection. Before choosing an operation, another card changes the first operand. After choosing an operation, another card attempts the merge. Escape clears the pending selection, and another operation button changes the pending operation.
-- An invalid merge leaves the cards intact and retains the first card and operation so another second card can be chosen. Show the reason near the toolbar and announce it accessibly.
+- Clicking the first selected card again clears the pending selection. A different card selects the second operand; clicking it again deselects it, and another distinct card replaces it. If an operation is already selected, choosing the second card attempts the merge; if both cards are selected, choosing an operation attempts it. Escape clears pending selection.
+- An invalid merge leaves the cards intact and retains the operand pair and operation so another operation or second card can be chosen. Show the reason near the toolbar and announce it accessibly.
 - Undo restores the last board and expression state, clearing pending selection. Undo remains part of the same timed run. Disable undo after a recorded win or give-up to keep records consistent.
 - Provide a visible Give up button during an active run. Confirm before ending the run; canceling keeps the run active and its timer running. Confirming stops the timer, clears pending selection, records a `given_up` outcome with elapsed time, and opens a summary with New hand / Menu actions. Do not claim the hand was unsolvable or automatically reveal a solution.
-- Provide Restart, New hand, and a way back to the menu. Restart restores the same original eight-card hand with fresh card IDs, no merge history, and a new timer/run ID. New hand draws another random hand. Restarting, drawing a new hand, or leaving an unfinished run records abandonment; confirm first. Restart from a finished summary creates a new attempt without modifying the previous outcome. The confirmation must distinguish replaying this hand from drawing a new one.
+- Provide Give up and a way back to the menu. Confirming a menu exit from active play records a give-up, including duration. Do not offer Restart or New hand during play. After a win or give-up, Play again starts a fresh deal with a new run ID and timer. Interruptions such as reload remain abandoned outcomes.
 - Start the timer once the initial board is ready for interaction, stop on the winning or confirmed give-up transition, and include time spent in a background tab. Use a monotonic clock; selection and animation do not reset the timer. Do not resume an unfinished run after a reload in the first version.
 - Record each terminal outcome once using a unique run ID: `won`, `given_up`, or `abandoned`. Preserve outcome, start/end timestamps, and elapsed duration when known; store started-run count separately. New hand or menu exit from an active run records abandonment, not an explicit give-up. A persisted active-run marker allows a reload to classify an interrupted run as abandoned without inventing a precise duration.
 - Label the winning-time average as “Last 20 wins”; when fewer than 20 wins exist, average those available and display the sample count. Only wins contribute to winning-time statistics. Show an empty state before the first win.
@@ -94,6 +94,41 @@ The lead defines shared contracts before workers begin: `CardId`, `SourceCard`, 
 The engine should expose pure operations for creating a hand, validating/applying a merge, and checking a win. The run lifecycle owns timing and persistence; the UI dispatches intent and renders state. Expressions preserve operand order and source identities. All terminal records use a unique run ID so repeated renders or competing finish actions cannot record the same attempt twice.
 
 ## Visual design and motion
+
+### Starting-screen and control refresh
+
+The user requested a more playful poker-style font, larger starting-screen typography, removal of the “Eight cards. Five operations. One number to make.” tagline, a larger and more playful Take a seat button, and larger in-game operations. Vertical scrolling is welcome; do not shrink the menu just to fit one viewport.
+
+1. Lead: record this plan, obtain a locally served open-license display font, and own integration/documentation/commits.
+2. Menu worker: own `src/features/menu/**`; use Rye for the title and primary action, enlarge the menu's text and spacing, remove the tagline, and style the Play action as a warm gold casino plaque with decorative suits and clear focus/hover states.
+3. Controls worker: own `src/features/play/play.css`; enlarge operation symbols and buttons, retain all five in a fluid row, and preserve usable touch targets without horizontal overflow at 320px.
+4. Lead: inspect the combined changes and production build, adjust only observed issues, then commit and push the completed refresh. No new behavior or tests are required for this visual update.
+
+Keep the green felt and ivory/gold palette, native button semantics, reduced-motion support, and readable text. Bundle the font and its license so playing does not require a third-party font request.
+
+### Keyboard operations and detailed rules (added during refresh)
+
+- Controls worker additionally owns `src/features/play/**` for keyboard behavior. After choosing the first card, A selects addition, S subtraction, D multiplication, F division, and G exponentiation. Mouse/touch buttons remain available. Show a small, persistent shortcut label under every button and expose `aria-keyshortcuts`/accessible descriptions.
+- Ignore repeated keydowns, modified key combinations, editable fields, finished runs, and any open dialog/inert play screen. Operation keys do nothing until a first card is selected; choosing another operation replaces the pending choice. Escape clears selection only during unobstructed play.
+- Menu worker adds an expandable Rules & how to play section directly on the starting screen, with clear descriptions of all-eight-card winning, ordered operands, exact fractions and integer powers, keyboard shortcuts, Undo/Restart/New hand/Give up, timing/statistics, and random hands without guaranteed solutions.
+- Restyle Your statistics as an attractive secondary casino plaque with a distinct win-count badge. Preserve a clear hierarchy below the larger Take a seat action.
+- Lead checks keyboard selection and dialog guards, rules disclosure, button sizing and viewport fit, then commits/pushes the integrated update. Add targeted shortcut checks for the new behavior; a broad repeat of unchanged database tests is unnecessary.
+
+### Additional refresh requirements
+
+- Scale card text to fit its actual width and character count so 2025 is fully visible even at 320px. Keep a selected-card inspector for very long values. Remove the redundant native hover tooltip that showed source values twice (for example 11 and expression 11).
+- Apply the same raised, double-inset casino-plaque shape to all action controls; distinguish gold primary actions, champagne statistics, forest secondary/operation controls, and a warmer Give up shade.
+- Remove decorative copy such as Make every card count, 2025 club, the menu tagline, and the promotional footer. Retain the target, timer, card count, rules, and keyboard guidance.
+- Remove Restart and New hand. Keep Undo; Give up is the only deliberate way to end an active run. Menu exit confirms a give-up; Play again appears after completion.
+- Controls worker adds the alternative card → card → operation flow with gold first-card and blue second-card borders, matching accessible order labels, and keyboard support. Invalid operations retain both selections; selecting another second card replaces it. Add focused transition tests covering both orders, operand order, deselection, replacement, and recovery.
+- The user explicitly prefers a minimal game interface. Remove visible First/Second legends and flow explanations from play; keep operand order in accessible labels. Put detailed guidance behind an in-game ? disclosure and the starting-screen rules section. This preference is also recorded in `AGENTS.md`.
+
+### Refresh validation and preview limit
+
+- The production build passed after the visual, keyboard, and two-order selection changes. Focused keyboard/selection checks passed **30/30**.
+- Browser component checks confirmed local Rye typography, expandable rules, all five shortcuts, keyboard/dialog guards, both merge orders, correct gold/blue borders, and no card hover tooltip. At 320px the complete 2025 fit its card, menu buttons did not overflow, and operation controls remained at least 47px wide/68px tall.
+- Detailed rules and the in-game ? panel share one rules component. No visible workflow explanation or First/Second legend remains during normal play.
+- The pre-existing local PGlite directory failed to reopen during preview startup. It was preserved without deletion, reset, or repair. Browser checks used temporary component fixtures that do not access player records; full app/database checks are therefore not claimed for this refresh. Database recovery is a separate issue.
 
 - Build an atmospheric poker-table setting: deep forest green felt, subtle CSS texture, a soft central pool of light, dark surrounding rail, and fine warm gold rules. Use CSS for the felt and decoration rather than downloading unnecessary imagery.
 - Use large, readable ivory number cards with rounded corners and restrained shadows. Selected cards get a gold border and visible focus treatment. Numeric value stays the only visible card content; playing card mode changes the rank label rather than adding suit illustrations.

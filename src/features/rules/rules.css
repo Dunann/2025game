@@ -1,0 +1,9 @@
+.rules-content { text-align: left; }
+.rules-content h2 { color: var(--ivory); font-size: 25px; margin: 24px 0 10px; }
+.rules-content h2:first-child { margin-top: 0; }
+.rules-content p, .rules-content li { color: var(--muted); font-size: 18px; line-height: 1.8; }
+.rules-content p { margin: 10px 0 18px; }
+.rules-content ul { padding-left: 24px; margin: 10px 0 18px; }
+.rules-content li + li { margin-top: 12px; }
+.rules-content strong { color: var(--ivory); }
+@media (max-width: 480px) { .rules-content p, .rules-content li { font-size: 17px; } }

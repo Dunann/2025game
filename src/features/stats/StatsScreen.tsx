@@ -22,7 +22,7 @@ export function StatsScreen({ data, onMenu, onReset }: Props) {
     <section className="stats-section" aria-labelledby="giveup-title">
       <div className="stats-section-heading"><h2 id="giveup-title">When you call it a day</h2><span>{stats.givenUp} give-ups</span></div>
       <div className="stats-giveups"><Stat label="Average time until give up" value={formatDuration(stats.giveUpAverage)} detail="All explicit give-ups" /><Stat label="Last 20 give-ups" value={formatDuration(stats.last20GiveUpsAverage)} detail={`Average · ${sample(stats.last20GiveUpsCount)}`} /></div>
-      <p className="stats-explanation">Restarting, leaving a hand, and interrupted runs count as abandoned. They affect success rate, but never winning or give-up times. An active hand is excluded.</p>
+      <p className="stats-explanation">Giving up or confirming a return to the menu records a give-up. Interrupted runs count as abandoned and affect success rate, but never winning or give-up times. An active hand is excluded.</p>
     </section>
     <section className="stats-section" aria-labelledby="history-title">
       <div className="stats-section-heading"><h2 id="history-title">Recent attempts</h2><span>Latest 20</span></div>

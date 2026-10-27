@@ -4,6 +4,10 @@ import type { GameState, Operation, RunOutcome } from '../../types';
 import { OPERATION_LABELS, OPERATION_NAMES } from '../../types';
 import { formatDuration } from '../../format';
 import { formatExpression, formatValue } from '../../game';
+import { OPERATION_CONTROLS, playKeyAction } from './keyboard';
+import { EMPTY_SELECTION, transitionSelection } from './selection';
+import { RulesContent } from '../rules/RulesContent';
+import type { SelectionAction } from './selection';
 import './play.css';
 
 export interface PlayScreenProps {
@@ -14,13 +18,11 @@ export interface PlayScreenProps {
   error: string | null;
   onMerge: (firstId: string, operation: Operation, secondId: string) => void;
   onUndo: () => void;
-  onRestart: () => void;
-  onNewHand: () => void;
+  onPlayAgain: () => void;
   onGiveUp: () => void;
   onMenu: () => void;
 }
 
-const operations: Operation[] = ['add', 'subtract', 'multiply', 'divide', 'power'];
 type Position = { slot: number; tilt: number };
 type Burst = { id: number; cardId: string };
 
@@ -44,14 +46,16 @@ function arrange(ids: string[], previous: Record<string, Position>): Record<stri
 
 export function PlayScreen(props: PlayScreenProps) {
   const { game, playingCardMode, elapsedMs, outcome, error, onMerge } = props;
-  const [firstId, setFirstId] = useState<string | null>(null);
-  const [operation, setOperation] = useState<Operation | null>(null);
+  const [selection, setSelection] = useState(EMPTY_SELECTION);
+  const { firstId, secondId, operation } = selection;
   const [positions, setPositions] = useState(() => arrange(game.cards.map(card => card.id), {}));
   const [burst, setBurst] = useState<Burst | null>(null);
   const cardButtons = useRef(new Map<string, HTMLButtonElement>());
   const terminalHeading = useRef<HTMLHeadingElement>(null);
+  const screen = useRef<HTMLElement>(null);
   const previous = useRef({ revision: game.revision, ids: game.cards.map(card => card.id) });
   const firstCard = game.cards.find(card => card.id === firstId);
+  const secondCard = game.cards.find(card => card.id === secondId);
   const finished = outcome !== null;
 
   useLayoutEffect(() => {
@@ -59,8 +63,7 @@ export function PlayScreen(props: PlayScreenProps) {
     setPositions(current => arrange(ids, current));
     const before = previous.current;
     if (before.revision !== game.revision || before.ids.join('|') !== ids.join('|')) {
-      setFirstId(null);
-      setOperation(null);
+      setSelection(EMPTY_SELECTION);
       const resultId = ids.find(id => !before.ids.includes(id));
       if (game.revision !== before.revision && ids.length === before.ids.length - 1 && resultId) {
         setBurst({ id: game.revision, cardId: resultId });
@@ -81,32 +84,38 @@ export function PlayScreen(props: PlayScreenProps) {
 
   useLayoutEffect(() => {
     if (finished) {
-      setFirstId(null);
-      setOperation(null);
+      setSelection(EMPTY_SELECTION);
       terminalHeading.current?.focus();
     }
   }, [finished]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setFirstId(null); setOperation(null); }
+      const target = event.target instanceof Element ? event.target : null;
+      const editing = !!target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+      const blocked = editing || !!screen.current?.closest('[inert], [aria-hidden="true"]') || !!screen.current?.querySelector('.play-help[open]') || !!document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+      const action = playKeyAction(event, { active: !finished, hasFirstCard: !!firstCard, blocked });
+      if (action === null) return;
+      event.preventDefault();
+      select(action === 'clear' ? { kind: 'clear' } : { kind: 'operation', operation: action });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [finished, firstCard, selection, onMerge]);
 
-  function selectCard(id: string) {
+  function select(action: SelectionAction) {
     if (finished) return;
-    if (id === firstId) { setFirstId(null); setOperation(null); return; }
-    if (firstId && operation) { onMerge(firstId, operation, id); return; }
-    setFirstId(id);
+    const next = transitionSelection(selection, action);
+    setSelection(next.selection);
+    if (next.merge) onMerge(next.merge.firstId, next.merge.operation, next.merge.secondId);
   }
 
   const instruction = finished ? 'Attempt complete' : !firstCard
     ? 'Choose your first card'
-    : !operation ? 'Now choose an operation' : 'Choose your second card';
+    : secondCard ? 'Choose an operation to combine your cards'
+      : operation ? 'Choose your second card' : 'Choose your second card or an operation';
 
-  return <section className="play-screen" aria-label="Play the 2025 game">
+  return <section ref={screen} className="play-screen" aria-label="Play the 2025 game">
     {!finished && <h1 className="sr-only">Play the 2025 game</h1>}
     <header className="play-header">
       <button className="button button-quiet" onClick={props.onMenu} aria-label="Return to main menu">← Menu</button>
@@ -115,20 +124,22 @@ export function PlayScreen(props: PlayScreenProps) {
     </header>
 
     <section className="play-table" aria-label="Game table">
-      <div className="table-caption"><span>MAKE EVERY CARD COUNT</span><span>{game.cards.length} {game.cards.length === 1 ? 'card' : 'cards'} remaining</span></div>
+      <div className="table-caption"><span>{game.cards.length} {game.cards.length === 1 ? 'card' : 'cards'} remaining</span></div>
       <div className="card-board" aria-label="Cards">
         {game.cards.map(card => {
           const position = positions[card.id];
           const value = formatValue(card.value, playingCardMode);
           const exact = formatValue(card.value);
-          const selected = card.id === firstId;
+          const firstSelected = card.id === firstId;
+          const secondSelected = card.id === secondId;
+          const selected = firstSelected || secondSelected;
           const arrival = burst?.cardId === card.id;
-          const style = { '--slot-column': (position?.slot ?? 0) % 4 + 1, '--slot-row': Math.floor((position?.slot ?? 0) / 4) + 1, '--card-tilt': `${position?.tilt ?? 0}deg` } as CSSProperties;
+          const style = { '--slot-column': (position?.slot ?? 0) % 4 + 1, '--slot-row': Math.floor((position?.slot ?? 0) / 4) + 1, '--card-tilt': `${position?.tilt ?? 0}deg`, '--value-length': Math.max(1, value.length) } as CSSProperties;
           return <div className={`card-slot${arrival ? ' card-arrival' : ''}`} key={card.id} style={style}>
-            <button type="button" className={`number-card${selected ? ' is-selected' : ''}${value.length > 9 ? ' is-long' : ''}`}
+            <button type="button" className={`number-card${firstSelected ? ' is-selected' : ''}${secondSelected ? ' is-second-selected' : ''}`}
               ref={element => { if (element) cardButtons.current.set(card.id, element); else cardButtons.current.delete(card.id); }}
-              aria-pressed={selected} aria-label={`Card ${exact}${selected ? ', first operand selected' : ''}. Uses ${card.sourceIds.length} of 8 original cards.`}
-              title={`${exact}\n${formatExpression(card.expression)}`} disabled={finished} onClick={() => selectCard(card.id)}>
+              aria-pressed={selected} aria-label={`Card ${exact}${firstSelected ? ', first operand selected' : secondSelected ? ', second operand selected' : ''}. Uses ${card.sourceIds.length} of 8 original cards.`}
+              disabled={finished} onClick={() => select({ kind: 'card', id: card.id })}>
               <span>{value}</span>
             </button>
             {arrival && <span className="merge-burst" key={burst.id} aria-hidden="true">{Array.from({ length: 12 }, (_, index) =>
@@ -136,28 +147,28 @@ export function PlayScreen(props: PlayScreenProps) {
             )}</span>}
           </div>;
         })}
-        {!finished && game.cards.length === 1 && <p className="last-card-note">One card left. Undo to try another path, or start again.</p>}
       </div>
-      <div className="table-footer"><span>EXACT FRACTIONS · ALL 8 CARDS</span><span>2025 CLUB</span></div>
     </section>
 
     {finished ? <section className={`run-summary${outcome === 'won' ? ' is-win' : ''}`} aria-live="polite">
-      <span className="eyebrow">{outcome === 'won' ? 'A perfect hand' : 'Attempt complete'}</span>
       <h1 ref={terminalHeading} tabIndex={-1}>{outcome === 'won' ? 'You made 2025.' : outcome === 'given_up' ? 'Time to turn the cards.' : 'Until the next hand.'}</h1>
-      <p>{outcome === 'won' ? 'All eight cards. Seven moves. One beautiful number.' : 'Every attempt is part of the game. Try this hand again or draw a fresh one.'}</p>
       <strong className="summary-time">{formatDuration(elapsedMs)}</strong>
-      <div className="play-actions"><button className="button button-primary" onClick={props.onNewHand}>New hand</button><button className="button" onClick={props.onRestart}>Replay this hand</button><button className="button button-quiet" onClick={props.onMenu}>Main menu</button></div>
+      <div className="play-actions"><button className="button button-primary" onClick={props.onPlayAgain}>Play again</button><button className="button button-quiet" onClick={props.onMenu}>Main menu</button></div>
     </section> : <section className="operation-panel" aria-label="Merge controls">
-      <div className="pending-selection" aria-live="polite"><span className="eyebrow">{instruction}</span>
-        <p className="pending-expression"><span>{firstCard ? formatValue(firstCard.value, playingCardMode) : '?'}</span><span className="pending-symbol">{operation ? OPERATION_LABELS[operation] : '·'}</span><span>?</span></p>
+      <div className="pending-selection" aria-live="polite"><span className="sr-only">{instruction}</span>
+        {firstCard && <p className="pending-expression"><span className="first-operand">{formatValue(firstCard.value, playingCardMode)}</span><span className="pending-symbol">{operation ? OPERATION_LABELS[operation] : '·'}</span><span className="second-operand">{secondCard ? formatValue(secondCard.value, playingCardMode) : '?'}</span></p>}
       </div>
       <div className="operation-buttons" role="group" aria-label="Choose an operation">
-        {operations.map(op => <button key={op} className={`operation-button${operation === op ? ' is-selected' : ''}`} disabled={!firstCard}
-          aria-label={OPERATION_NAMES[op]} aria-pressed={operation === op} onClick={() => setOperation(op)}>{OPERATION_LABELS[op]}</button>)}
+        {OPERATION_CONTROLS.map(({ operation: op, key }) => <div className="operation-control" key={op}>
+          <button className={`button operation-button${operation === op ? ' is-selected' : ''}`} disabled={!firstCard}
+            aria-label={OPERATION_NAMES[op]} aria-pressed={operation === op} aria-keyshortcuts={key} aria-describedby={`operation-shortcut-${op}`}
+            onClick={() => select({ kind: 'operation', operation: op })}>{OPERATION_LABELS[op]}</button>
+          <small className="operation-shortcut" id={`operation-shortcut-${op}`}><kbd>{key.toUpperCase()}</kbd> key</small>
+        </div>)}
       </div>
-      <p className={`merge-message${error ? ' is-error' : ''}`} role={error ? 'alert' : undefined}>{error ?? 'Select a card, an operation, then another card. Escape clears your selection.'}</p>
+      {error && <p className="merge-message is-error" role="alert">{error}</p>}
       {firstCard && <details className="card-details"><summary>Inspect selected card</summary><p><strong>Exact value:</strong> {formatValue(firstCard.value)}</p><p><strong>Expression:</strong> {formatExpression(firstCard.expression)}</p><p>Uses {firstCard.sourceIds.length} of 8 original cards.</p></details>}
-      <div className="play-actions"><button className="button button-quiet" disabled={!game.history.length} onClick={props.onUndo}>↶ Undo</button><button className="button button-quiet" onClick={props.onRestart}>Restart</button><button className="button button-quiet" onClick={props.onNewHand}>New hand</button><button className="button button-quiet give-up-button" onClick={props.onGiveUp}>Give up</button></div>
+      <div className="play-actions"><button className="button button-quiet" disabled={!game.history.length} onClick={props.onUndo}>↶ Undo</button><button className="button give-up-button" onClick={props.onGiveUp}>Give up</button><details className="play-help"><summary className="button button-quiet" aria-label="Game rules">?</summary><section className="play-help-panel" aria-label="Game rules"><RulesContent /></section></details></div>
     </section>}
   </section>;
 }

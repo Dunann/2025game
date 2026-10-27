@@ -20,19 +20,19 @@ Optional configuration is documented in [.env.example](.env.example). Copy it to
 ## Play
 
 1. Choose **Take a seat** from the main menu.
-2. Select a card, choose an operation, then select a different card. Selection order determines subtraction, division, and exponentiation.
+2. Select a card, choose an operation, then select a different card—or select both cards first, then the operation. Gold marks the first operand and blue the second. Selection order determines subtraction, division, and exponentiation.
 3. The two operands become a new result card at a random free table position, accompanied by a short particle burst.
 4. Use all eight original cards to leave one card equal to 2025. There are seven successful merges in a winning hand.
 
 All cards display just their value. The main menu's **Playing card mode** changes 1, 11, 12, and 13 to A, J, Q, and K, including merged results with those exact values.
 
 - **Undo:** restore the previous board; the timer keeps running.
-- **Restart:** replay this hand with the same original ranks/suits, a new attempt, and a fresh timer. Confirming ends an active attempt as abandoned.
-- **New hand:** end the current attempt and draw another random hand.
 - **Give up:** confirm to stop the timer and save a give-up result with its duration.
+- **Play again:** deal the next hand after a win or give-up. Leaving active play through the menu also asks you to confirm giving up.
+- **A / S / D / F / G:** choose add / subtract / multiply / divide / power after selecting the first card or both operands. Keys are displayed under the buttons.
 - **Escape:** clear the selected card and operation.
 
-Negative and fractional results are allowed. Fractions are exact, backed by BigInt. Powers require an integer exponent between −1024 and 1024, and numerator/denominator size is limited to 4096 bits to keep calculations responsive. Division by zero, zero to a negative power, and `0^0` are rejected without consuming cards. Inspect a selected card to see its full value and expression.
+Negative and fractional results are allowed. Fractions are exact, backed by BigInt. Powers require an integer exponent between −1024 and 1024, and numerator/denominator size is limited to 4096 bits to keep calculations responsive. Division by zero, zero to a negative power, and `0^0` are rejected without consuming cards. Inspect a selected card to see its full value and expression. The starting screen includes expandable Rules & how to play.
 
 Hands are random and **not guaranteed solvable**. A validated hand generator or solver is planned for a later version. Merge particles respect reduced-motion preferences, and every game control is keyboard accessible.
 
@@ -45,7 +45,7 @@ The statistics screen includes:
 - Wins, best winning time, and average of the latest 20 wins, with the available sample count.
 - Success rate: wins divided by all ended attempts (wins + explicit give-ups + other abandonments). Active attempts are excluded.
 - Give-up count, average time until giving up, and average of the latest 20 give-ups.
-- Recent attempt history. Restarting or leaving a hand counts as abandonment; interrupted runs are reconciled on the next load with an unknown duration.
+- Recent attempt history. Giving up or confirming a menu exit records a give-up; interrupted runs are reconciled on the next load as abandoned with an unknown duration. Older records can also contain abandonments from the earlier Restart/New hand controls.
 
 The timer includes time in background tabs. Browser storage caches records; an ordered save queue retries failed API writes without recording an outcome twice. Save status is visible. Keep the tab open until records are saved; unsent writes survive a reload of the same tab when session storage is available, but are not guaranteed to survive closing the tab. Stats reset requires confirmation and keeps the display preference.
 

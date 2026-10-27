@@ -1,19 +1,57 @@
-.main-menu { width: min(100%, 560px); margin: auto; padding: 34px 24px 30px; text-align: center; color: var(--ivory); }
-.menu-seal { color: var(--gold); font-size: 32px; margin-bottom: 14px; }
-.menu-title { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(92px, 20vw, 152px); line-height: .9; font-weight: 400; letter-spacing: -.065em; margin: 25px 0 24px; text-shadow: 0 6px 22px #0003; }
-.menu-title span { display: block; font: 500 12px/1.3 system-ui, sans-serif; letter-spacing: .35em; text-transform: uppercase; margin-top: 18px; color: var(--gold); }
-.menu-intro { font-family: Georgia, 'Times New Roman', serif; font-size: 23px; line-height: 1.5; color: var(--ivory); margin-bottom: 28px; }
-.menu-actions { display: grid; gap: 12px; margin: 0 auto 30px; max-width: 340px; }
-.menu-actions .button { display: flex; justify-content: space-between; align-items: center; }
-.menu-win-count { font-size: 12px; opacity: .7; font-weight: 400; }
-.menu-rules { border-top: 1px solid #cfb77b42; border-bottom: 1px solid #cfb77b42; padding: 24px 8px 20px; }
-.menu-rules p:not(.eyebrow) { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 12px 0; }
+﻿@font-face {
+  font-family: 'Rye';
+  src: url('../../assets/fonts/Rye-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+.main-menu { width: min(100%, 720px); margin: auto; padding: 44px 24px 40px; text-align: center; color: var(--ivory); }
+.main-menu .eyebrow { font-size: clamp(15px, 2.3vw, 18px); letter-spacing: .16em; line-height: 1.7; }
+.menu-seal { color: var(--gold); font-size: 48px; margin-bottom: 20px; text-shadow: 0 4px 12px #0004; }
+.menu-title { font-family: 'Rye', Georgia, serif; font-size: clamp(76px, 22vw, 210px); line-height: 1.05; font-weight: 400; letter-spacing: -.055em; margin: 30px 0 46px; text-shadow: 0 2px 0 #bda66e, 0 5px 0 #796134, 0 9px 0 #08271e, 0 14px 28px #0005; }
+.menu-title span { display: block; font: 600 clamp(17px, 2.5vw, 23px)/1.5 'Segoe UI', sans-serif; letter-spacing: .25em; text-transform: uppercase; margin-top: 26px; color: var(--gold); text-shadow: 0 2px 8px #0004; }
+.menu-actions { display: grid; gap: 20px; margin: 0 auto 44px; max-width: 510px; }
+.menu-actions .button { display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 64px; font-size: 20px; }
+.menu-actions .menu-play { justify-content: center; gap: clamp(14px, 3vw, 30px); min-height: 100px; padding: 22px 28px; font-family: 'Rye', Georgia, serif; font-size: clamp(26px, 4vw, 34px); font-weight: 400; letter-spacing: 0; }
+.menu-play-suit { font-family: Georgia, serif; font-size: .8em; opacity: .8; }
+.menu-actions .menu-stats { --button-top: #f7f0da; --button-bottom: #d5c69e; --button-ink: #274331; --button-edge: #fff7dc; --button-base: #82764e; --button-inset: #6d654b99; padding: 18px 24px; min-height: 82px; }
+.menu-stats-label { display: flex; align-items: center; gap: 14px; text-align: left; }
+.menu-stats-chip { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; border: 2px dashed #52633d; outline: 1px solid #52633d70; outline-offset: 3px; border-radius: 50%; color: #274331; font: 24px/1 Georgia, serif; }
+.menu-win-count { padding: 7px 12px; border: 1px solid #27433155; border-radius: 999px; background: #27433112; font-size: 16px; color: #274331; font-weight: 600; white-space: nowrap; }
+.menu-rules { text-align: left; }
+.menu-rules summary { min-height: 80px; padding: 24px 52px 24px 20px; font-family: 'Rye', Georgia, serif; font-size: clamp(20px, 3vw, 25px); line-height: 1.4; list-style: none; }
+.menu-rules summary::-webkit-details-marker { display: none; }
+.menu-rules summary:focus-visible { outline: 3px solid #f2d18b; outline-offset: 5px; }
+.menu-rules-toggle { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); font-family: 'Segoe UI', sans-serif; font-size: 32px; font-weight: 400; }
+.menu-rules[open] .menu-rules-toggle { transform: translateY(-50%) rotate(45deg); }
+.menu-rules-content { padding: 16px 20px 24px; margin-top: 16px; border-bottom: 1px solid #cfb77b65; }
+.menu-rules h2 { color: var(--ivory); font-size: 25px; margin: 24px 0 10px; }
+.menu-rules p, .menu-rules li { color: var(--muted); font-size: 18px; line-height: 1.8; }
+.menu-rules p { margin: 10px 0 18px; }
+.menu-rules ul { padding-left: 24px; margin: 10px 0 18px; }
+.menu-rules li + li { margin-top: 12px; }
 .menu-rules strong { color: var(--ivory); }
-.menu-operations { color: var(--gold); font-family: Georgia, serif; font-size: 27px; word-spacing: 22px; }
-.menu-operations span { opacity: .65; }
-.card-mode-setting { display: flex; text-align: left; justify-content: space-between; gap: 18px; align-items: center; max-width: 360px; margin: 24px auto; cursor: pointer; min-height: 44px; }
-.card-mode-setting strong { display: block; font-size: 13px; font-weight: 500; }
-.card-mode-setting small { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; }
-.card-mode-setting input { width: 23px; height: 23px; accent-color: var(--gold); flex: 0 0 auto; cursor: pointer; }
-.menu-footnote { color: var(--muted); opacity: .8; font-size: 11px; line-height: 1.7; }
-@media (max-width: 480px) { .main-menu { padding-top: 22px; } .menu-title { margin-top: 20px; } .menu-intro { font-size: 21px; } }
+.card-mode-setting { display: flex; text-align: left; justify-content: space-between; gap: 20px; align-items: center; max-width: 510px; margin: 36px auto; cursor: pointer; min-height: 54px; }
+.card-mode-setting strong { display: block; font-size: 20px; font-weight: 600; }
+.card-mode-setting small { display: block; color: var(--muted); font-size: 16px; line-height: 1.6; margin-top: 8px; }
+.card-mode-setting input { width: 28px; height: 28px; margin: 8px; accent-color: var(--gold); flex: 0 0 auto; cursor: pointer; }
+.menu-footnote { color: var(--muted); font-size: 16px; line-height: 1.8; margin-bottom: 0; }
+@media (max-width: 480px) {
+  .main-menu { padding: 28px 8px 34px; }
+  .main-menu .eyebrow { letter-spacing: .1em; }
+  .menu-title { margin-top: 24px; margin-bottom: 36px; }
+  .menu-title span { letter-spacing: .15em; }
+  .menu-actions .button { font-size: 18px; padding-left: 16px; padding-right: 16px; }
+  .menu-actions .menu-play { min-height: 88px; font-size: 26px; gap: 12px; padding-left: 16px; padding-right: 16px; }
+  .menu-actions .menu-stats { padding: 18px 16px; font-size: 17px; gap: 10px; }
+  .menu-stats-label { gap: 10px; }
+  .menu-stats-chip { width: 26px; height: 26px; font-size: 18px; }
+  .menu-win-count { font-size: 15px; padding: 6px 8px; }
+  .menu-rules summary { padding-left: 18px; font-size: 19px; }
+  .menu-rules-content { padding-left: 8px; padding-right: 8px; }
+  .menu-rules p, .menu-rules li { font-size: 17px; }
+  .card-mode-setting { gap: 12px; }
+  .card-mode-setting strong { font-size: 18px; }
+  .card-mode-setting small, .menu-footnote { font-size: 15px; }
+}

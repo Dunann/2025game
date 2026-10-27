@@ -10,7 +10,7 @@ Read `PLAN.md` before starting work. Treat its proposed defaults as provisional 
 
 Build a browser game with a starting menu, a play screen, and a statistics screen. A hand contains eight distinct cards drawn from a standard 52-card deck; card values are 1–13. Repeated values are allowed when the underlying cards differ.
 
-The interaction is ordered: select a first card, select an operation in a bottom toolbar, then select a different second card. Replace those two cards with one result card at a random valid position. For subtraction, division, and exponentiation, operand order follows selection order.
+Support both interaction orders: first card → operation → second card, and first card → second card → operation. Show the first card with a gold border and the second with a blue border; selection order defines subtraction, division, and exponentiation. A/S/D/F/G select add/subtract/multiply/divide/power. Replace the operands with one result card at a random valid position.
 
 Display numeric values by default. A playing card mode displays exact values 1, 11, 12, and 13 as A, J, Q, and K. All other values retain their numeric representation.
 
@@ -51,7 +51,8 @@ Paths are proposals until the lead creates the application. With two workers, co
 - Validate a merge before consuming cards. Rejected operations preserve the board and provide a clear explanation.
 - Keep game state authoritative; animations reflect committed transitions and cannot trigger a second merge.
 - Use the green felt table, ivory cards, warm gold accents, and merge-particle direction in `PLAN.md`. Honor reduced motion and keep decorative particles noninteractive.
-- Restart replays the original eight-card hand as a new timed attempt. New hand draws different cards. Confirm before ending an active attempt; record restart as abandonment, not give-up.
+- The latest user instruction removes Restart and New hand. Give up is the only deliberate way to end an active attempt; confirming a menu exit records a give-up too. Undo remains available; after a win/give-up offer Play again for the next deal. Interrupted runs still count as abandoned.
+- All action buttons use the same casino-plaque treatment with different color shades. Cards scale their visible number to fit, including the complete 2025 target, and have no native hover tooltip; full expressions remain available in the selected-card inspector.
 - Separate game values from screen coordinates. Reflow cards when the viewport changes without altering the hand or expression.
 - Use semantic buttons, visible focus, accessible names, adequate touch targets, keyboard operation, and reduced motion support.
 - Persist validated records and settings in the backend PostgreSQL database; browser storage is a cache. Record each terminal run outcome once, distinguishing wins, give-ups, and other abandonments. Handle unavailable browser cache and report backend save failures with retry.
@@ -59,6 +60,7 @@ Paths are proposals until the lead creates the application. With two workers, co
 - No paid resources or provider subscriptions are authorized. Keep local development free. Commit and push meaningful working checkpoints; push the completed first draft, as requested by the user.
 - Avoid adding accounts, leaderboards, a solver, or monetization unless the agreed scope requires them.
 - Keep secrets out of client code. Document build commands and any hosting configuration.
+- Keep the game interface concise. Do not add slogans, visible operand-order labels, workflow diagrams, or repeated instructions to ordinary play. Put detailed explanations behind the starting-screen rules disclosure or the in-game ? button. Retain accessible labels and essential feedback; small keyboard hints are explicitly requested.
 
 ## Validation and handoff
 

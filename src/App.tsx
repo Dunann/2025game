@@ -6,7 +6,7 @@ import { PlayScreen } from './features/play/PlayScreen';
 import { defaultData, finishRun, resetStats, saveData, startRun, updateSettings } from './storage';
 import { bootstrapProfile, saves, subscribeToSaves } from './persistence';
 import type { SaveCommand, SaveStatus } from './storage/sync';
-import type { ActiveRun, GameState, Operation, RunOutcome, SourceCard, StoredData } from './types';
+import type { ActiveRun, GameState, Operation, RunOutcome, StoredData } from './types';
 
 interface Session {
   game: GameState;
@@ -37,7 +37,6 @@ function ConfirmDialog({ title, description, action, confirm, cancel }: Confirma
           else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
         }
       }}>
-      <p className="eyebrow">THE NEXT MOVE</p>
       <h2 id="dialog-title">{title}</h2>
       <p id="dialog-description">{description}</p>
       <div className="dialog-actions">
@@ -108,9 +107,9 @@ export default function App() {
     setError(null);
     return next;
   }
-  function begin(hand?: SourceCard[]) {
+  function begin() {
     if (!ready) return;
-    const game = createGame(hand);
+    const game = createGame();
     const run = { id: crypto.randomUUID(), startedAt: Date.now() };
     const next = { game, run, clockStart: performance.now(), outcome: null, finalElapsedMs: null };
     persist(startRun(dataRef.current, run), { kind: 'start', run });
@@ -121,20 +120,10 @@ export default function App() {
   function confirmAction(title: string, description: string, action: string, callback: () => void) {
     setConfirmation({ title, description, action, confirm: () => { setConfirmation(null); callback(); } });
   }
-  function changeHand(restart: boolean) {
-    const current = sessionRef.current;
-    const originalHand = restart ? current?.game.initialHand : undefined;
-    const proceed = () => { finish('abandoned'); begin(originalHand); };
-    if (current && !current.outcome) {
-      confirmAction(restart ? 'Replay this hand?' : 'Deal a new hand?',
-        restart ? 'This attempt will count as abandoned. You’ll replay the same eight cards with a fresh timer.' : 'This attempt will count as abandoned. Eight new cards and a fresh timer are waiting.',
-        restart ? 'Restart hand' : 'New hand', proceed);
-    } else proceed();
-  }
   function menu() {
-    const proceed = () => { finish('abandoned'); setSession(null); setError(null); setPage('menu'); };
+    const proceed = () => { finish('given_up'); setSession(null); setError(null); setPage('menu'); };
     if (sessionRef.current && !sessionRef.current.outcome) {
-      confirmAction('Leave the table?', 'This unfinished attempt will count as abandoned in your success rate.', 'Return to menu', proceed);
+      confirmAction('Give up and leave the table?', 'Your time until giving up will be saved before returning to the menu.', 'Give up & leave', proceed);
     } else proceed();
   }
   function merge(firstId: string, operation: Operation, secondId: string) {
@@ -151,7 +140,7 @@ export default function App() {
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to content</a>
     <main id="main-content" className={`page page-${page}`} inert={confirmation ? true : undefined}>
-      {!ready && <section className="connection-screen" aria-live="polite"><p className="eyebrow">THE NUMBERS TABLE</p><h1 tabIndex={-1}>{loadError ? 'The table is taking a moment.' : 'Setting your table…'}</h1><p>{loadError ?? 'Connecting to your records.'}</p>{loadError && <button className="button button-primary" onClick={() => setLoadAttempt(value => value + 1)}>Retry connection</button>}</section>}
+      {!ready && <section className="connection-screen" aria-live="polite"><h1 tabIndex={-1}>{loadError ? 'Unable to connect' : 'Loading…'}</h1><p>{loadError ?? 'Connecting to your records.'}</p>{loadError && <button className="button button-primary" onClick={() => setLoadAttempt(value => value + 1)}>Retry connection</button>}</section>}
       {ready && page === 'menu' && <MainMenu settings={data.settings} onSettingsChange={(settings) => persist(updateSettings(dataRef.current, settings), { kind: 'settings', settings })}
         onPlay={() => begin()} onStats={() => setPage('stats')} wins={data.runs.filter((run) => run.outcome === 'won').length} />}
       {ready && page === 'stats' && <StatsScreen data={data} onMenu={() => setPage('menu')}
@@ -162,17 +151,16 @@ export default function App() {
           const current = sessionRef.current;
           if (current && !current.outcome && !confirmation) { setSession({ ...current, game: undoMerge(current.game) }); setError(null); }
         }}
-        onRestart={() => changeHand(true)} onNewHand={() => changeHand(false)} onMenu={menu}
+        onPlayAgain={() => begin()} onMenu={menu}
         onGiveUp={() => {
           if (sessionRef.current?.outcome) return;
           confirmAction('Call it a hand?', 'Your time until giving up will be saved. This attempt will count toward your success rate.', 'Give up', () => finish('given_up'));
         }} />}
     </main>
     {ready && <div className={`save-status${saveStatus.error ? ' has-error' : ''}`} role="status">
-      {saveStatus.error ? <>Records waiting to save: {saveStatus.error}<button onClick={() => saves.retry()}>Retry save</button></> : saveStatus.pending ? 'Saving your records…' : 'Records saved to your player session'}
+      {saveStatus.error ? <>Records waiting to save: {saveStatus.error}<button className="button button-quiet" onClick={() => saves.retry()}>Retry save</button></> : saveStatus.pending ? 'Saving…' : 'Saved'}
     </div>}
     {storageWarning && <p className="storage-warning" role="status">Browser cache is unavailable. Records can still save to the server; keep this page open until saving finishes.</p>}
-    <footer className="site-footer"><span>2025 / THE NUMBERS TABLE</span><span>Eight cards. One possibility.</span></footer>
     {confirmation && <ConfirmDialog {...confirmation} cancel={() => setConfirmation(null)} />}
   </div>;
 }
