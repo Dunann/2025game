@@ -2,7 +2,7 @@
 
 ## Current authorization
 
-This project is in planning only. The user authorized creation of planning documents and explicitly asked to stop before implementation. Do not scaffold an application, install dependencies, create product code, or publish a website until implementation is authorized. Reading and editing planning documents is allowed.
+Implementation is now authorized. The user requested that the initial planning documents be pushed first, then updated with a green felt poker-table design, merge particles, and a Restart button, followed by implementation by a lead and three workers. The initial planning documents were pushed in commit `46237e3`. Build and validate locally in this repository; public hosting remains a later delivery decision.
 
 Read `PLAN.md` before starting work. Treat its proposed defaults as provisional where decisions remain open. User answers override those defaults; update the plan when answers arrive.
 
@@ -20,7 +20,7 @@ Include a Give up button that ends the run and records its elapsed time. Statist
 
 ## Team for a future implementation
 
-Use a lead agent and three workers by default. Two workers are sufficient for a smaller execution; a fourth worker can own verification and accessibility. The user has requested a plan for multiple agents, not implementation during this planning session.
+Use a lead agent and three workers for this implementation. The primary agent acts as the lead, leaving all three worker slots available. Worker file ownership below applies in the shared checkout; do not commit or change shared files without coordinating with the lead.
 
 | Role | Responsibility | Suggested ownership after scaffolding |
 | --- | --- | --- |
@@ -50,14 +50,17 @@ Paths are proposals until the lead creates the application. With two workers, co
 - Centralize arithmetic validity, result formatting, and win detection. Never infer numeric values from displayed face labels.
 - Validate a merge before consuming cards. Rejected operations preserve the board and provide a clear explanation.
 - Keep game state authoritative; animations reflect committed transitions and cannot trigger a second merge.
+- Use the green felt table, ivory cards, warm gold accents, and merge-particle direction in `PLAN.md`. Honor reduced motion and keep decorative particles noninteractive.
+- Restart replays the original eight-card hand as a new timed attempt. New hand draws different cards. Confirm before ending an active attempt; record restart as abandonment, not give-up.
 - Separate game values from screen coordinates. Reflow cards when the viewport changes without altering the hand or expression.
 - Use semantic buttons, visible focus, accessible names, adequate touch targets, keyboard operation, and reduced motion support.
-- Persist only versioned, validated records and settings. Record each terminal run outcome once, distinguishing wins, give-ups, and other abandonments. Handle malformed or unavailable browser storage without preventing play.
-- Avoid adding accounts, remote storage, leaderboards, a solver, or monetization unless the agreed scope requires them.
+- Persist validated records and settings in the backend PostgreSQL database; browser storage is a cache. Record each terminal run outcome once, distinguishing wins, give-ups, and other abandonments. Handle unavailable browser cache and report backend save failures with retry.
+- The user added backend/database scope during implementation. The lead may reassign an available worker to `server/**` and another to the API client while preserving exclusive file ownership. Server-side PGlite is allowed for local development; production uses PostgreSQL via `DATABASE_URL`.
+- Avoid adding accounts, leaderboards, a solver, or monetization unless the agreed scope requires them.
 - Keep secrets out of client code. Document build commands and any hosting configuration.
 
 ## Validation and handoff
 
-The implementation plan includes targeted engine, interaction, and persistence checks. Execute them when implementation and its validation are authorized. No application tests are needed for this documentation-only phase.
+Implementation and its targeted validation are authorized. Use the acceptance checks in `PLAN.md`; report actual results and any browser verification limits.
 
 For an implementation handoff, report what changed, how it was checked, remaining issues, and how to run it. Distinguish a locally working site from a publicly deployed site. Never claim a hand is solvable without a validated solution or a complete solver result.

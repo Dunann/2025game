@@ -1,6 +1,6 @@
 # 2025 game implementation plan
 
-Status: planning only. No application has been implemented. The repository initially contained only Git metadata.
+Status: implementation authorized. Initial planning documents were pushed to `origin/main` in commit `46237e3` before this revision. The lead will establish shared contracts and coordinate three workers in the existing repository.
 
 ## Intended experience
 
@@ -23,7 +23,8 @@ The statistics screen shows wins, best winning time, the average time of the lat
 - Default cards show numbers. Optional playing card mode maps 1 to A, 11 to J, 12 to Q, and 13 to K.
 - Include a Give up button and record time elapsed until giving up.
 - Track wins, best time, average time of the last 20 wins, success rate, and give-up statistics, with aggregation details proposed below.
-- Prepare for implementation by a lead and 2–4 workers, and stop after planning in this session.
+- Implement with the primary agent as lead and three workers after updating this plan.
+- Use a poker-table visual design with green felt, particles after successful merges, and a Restart button.
 
 ### Confirmed rule decisions
 
@@ -51,19 +52,30 @@ These defaults can be adjusted during implementation without changing the core p
 - An invalid merge leaves the cards intact and retains the first card and operation so another second card can be chosen. Show the reason near the toolbar and announce it accessibly.
 - Undo restores the last board and expression state, clearing pending selection. Undo remains part of the same timed run. Disable undo after a recorded win or give-up to keep records consistent.
 - Provide a visible Give up button during an active run. Confirm before ending the run; canceling keeps the run active and its timer running. Confirming stops the timer, clears pending selection, records a `given_up` outcome with elapsed time, and opens a summary with New hand / Menu actions. Do not claim the hand was unsolvable or automatically reveal a solution.
-- Provide New hand and a way back to the menu. Restarting or leaving an unfinished run abandons that run. Confirm abandoning a run after play has started; browser unload confirmation is optional and should not be required for correctness.
+- Provide Restart, New hand, and a way back to the menu. Restart restores the same original eight-card hand with fresh card IDs, no merge history, and a new timer/run ID. New hand draws another random hand. Restarting, drawing a new hand, or leaving an unfinished run records abandonment; confirm first. Restart from a finished summary creates a new attempt without modifying the previous outcome. The confirmation must distinguish replaying this hand from drawing a new one.
 - Start the timer once the initial board is ready for interaction, stop on the winning or confirmed give-up transition, and include time spent in a background tab. Use a monotonic clock; selection and animation do not reset the timer. Do not resume an unfinished run after a reload in the first version.
 - Record each terminal outcome once using a unique run ID: `won`, `given_up`, or `abandoned`. Preserve outcome, start/end timestamps, and elapsed duration when known; store started-run count separately. New hand or menu exit from an active run records abandonment, not an explicit give-up. A persisted active-run marker allows a reload to classify an interrupted run as abandoned without inventing a precise duration.
 - Label the winning-time average as “Last 20 wins”; when fewer than 20 wins exist, average those available and display the sample count. Only wins contribute to winning-time statistics. Show an empty state before the first win.
 - Proposed success rate: `wins / (wins + give-ups + other abandoned runs) × 100%`. Exclude the currently active run; show an empty state when no run has ended. Label the denominator as ended attempts and show outcome counts so the definition is clear. An interrupted run counts after its abandonment has been reconciled.
 - Show give-up count, average time until give up across all explicit give-ups, and average time of the last 20 explicit give-ups with sample counts. Run history shows each give-up's elapsed time. Exclude other abandonments from give-up-time aggregates, and show an empty state when there are no give-ups.
-- Store stats and the display preference locally in the browser. The first version has no login or cross-device synchronization. Offer a deliberate reset-stats action with confirmation.
+- Store stats and display preference in the backend PostgreSQL database, with browser caching and explicit save status. The first version has anonymous sessions and no cross-device login. Offer a deliberate reset-stats action with confirmation.
 - Place cards randomly inside the usable board, excluding the toolbar and other cards. Try bounded random candidates, then use a known free slot. Keep all cards visible and reachable; on small screens use shuffled grid slots as a constrained random layout. Reposition on resize without changing values.
 - Include a clear win screen with elapsed time and Play again / Menu actions. Do not call a deal unwinnable just because no obvious move remains.
 
 ## Proposed architecture
 
-Use a small TypeScript browser application, provisionally React with Vite, with CSS for responsive layout. Confirm the current tooling versions when implementation begins. A static build and browser storage cover the initial scope; a backend is unnecessary for the proposed features.
+Use a TypeScript React/Vite browser application with responsive CSS, plus a Node/Express backend and PostgreSQL database. The user expanded scope during implementation to include a backend database in preparation for online play. Browser storage is now a cache, not the primary record store.
+
+### Backend and database scope
+
+- Persist anonymous players, settings, runs, terminal outcomes, and active-run markers in relational PostgreSQL tables with versioned migrations, foreign keys, unique run IDs, and validation constraints.
+- Identify anonymous players using an opaque, HttpOnly same-site session cookie. Keep database credentials server-side. Accounts and cross-device login are future work; anonymous identity is tied to the browser cookie.
+- Expose same-origin API endpoints for profile loading, settings, starting/finishing runs, and stats reset. Use parameterized queries, transactions, request validation, bounded payloads, and consistent errors. Isolate records by player identity.
+- Hosted deployment uses PostgreSQL through `DATABASE_URL`. Docker/PostgreSQL is not installed on the current machine; support server-side PGlite (embedded PostgreSQL persisted to disk) for local development and integration checks. Both adapters use the same SQL schema. Production requires `DATABASE_URL`.
+- Load records from the API before enabling play. Keep arithmetic responsive in the browser, queue backend writes in order, and visibly report failed saves with retry. Do not claim unsynced records are saved to the server.
+- The initial API stores client-submitted personal practice results. Competitive online play later requires server-authoritative deals, move validation, timing, and authentication before enabling rankings.
+- Add database/API integration checks for player isolation, duplicate finishes, interruption handling, malformed input, transactional reset, and persistence. Document environment variables, migrations, local startup, and hosted PostgreSQL setup.
+- Provider choice remains open. Standard PostgreSQL allows a later choice among providers; Supabase is a candidate if managed authentication becomes a priority. No provider account or paid resource is needed for the local implementation.
 
 | Area | Responsibility |
 | --- | --- |
@@ -71,18 +83,29 @@ Use a small TypeScript browser application, provisionally React with Vite, with 
 | `src/features/play/` | Board layout, selectable cards, toolbar, timer presentation, undo, Give up, and run completion |
 | `src/features/menu/` | Starting menu and display settings |
 | `src/features/stats/` | Aggregated statistics, history presentation, empty state, reset flow |
-| `src/storage/` | Versioned settings and run records, validation and migration |
+| `src/storage/` | Browser cache, API client, settings and run record transitions |
+| `server/` | HTTP API, anonymous sessions, PostgreSQL adapters, migrations, database validation |
 | App shell / shared types | Navigation, run lifecycle, dependency wiring, common styling |
 
 The lead defines shared contracts before workers begin: `CardId`, `SourceCard`, `GameValue`, `Expression`, `ActiveCard`, `Operation`, `GameState`, `MergeResult`, `RunOutcome`, `RunRecord`, and `Settings`. `RunOutcome` distinguishes wins, explicit give-ups, and other abandonments; `RunRecord` carries duration and timestamps. Keep layout coordinates outside arithmetic state. Inject randomness and the clock where needed to make behavior reproducible in checks.
 
 The engine should expose pure operations for creating a hand, validating/applying a merge, and checking a win. The run lifecycle owns timing and persistence; the UI dispatches intent and renders state. Expressions preserve operand order and source identities. All terminal records use a unique run ID so repeated renders or competing finish actions cannot record the same attempt twice.
 
+## Visual design and motion
+
+- Build an atmospheric poker-table setting: deep forest green felt, subtle CSS texture, a soft central pool of light, dark surrounding rail, and fine warm gold rules. Use CSS for the felt and decoration rather than downloading unnecessary imagery.
+- Use large, readable ivory number cards with rounded corners and restrained shadows. Selected cards get a gold border and visible focus treatment. Numeric value stays the only visible card content; playing card mode changes the rank label rather than adding suit illustrations.
+- Give the main menu a clear typographic hierarchy: small club-style wordmark, prominent 2025 title, short rules, a primary Play action, and secondary Stats access. Carry the same materials and colors through stats, dialogs, and summaries.
+- Keep the timer, target, and cards remaining visible above the board. Place the five operation buttons in a bottom toolbar with the pending expression nearby. Keep Undo, Restart, New hand, and Give up distinct and readable on narrow screens.
+- After each successful merge, emit a short burst of small ivory/gold particles around the new card and animate its arrival. Invalid operations do not emit particles. Use a bounded number of particles, remove them after animation, and prevent them from blocking pointer or keyboard input.
+- Under `prefers-reduced-motion`, replace travel/burst animations with an immediate or subtle opacity change. Decorative layers are hidden from assistive technology. Maintain contrast and touch targets; the table theme must not impair play.
+- At mobile sizes, shrink the rail and use randomized grid slots with enough board space for all cards. Long exact fractions remain readable through truncation plus a full-value accessible/detail view.
+
 ## Milestones and agent assignments
 
-### 0. Finalize implementation details and await authorization — lead
+### 0. Finalize implementation details — lead
 
-Use the confirmed rules above, finalize numeric limits and statistics labels, and keep acceptance criteria aligned. Guaranteed solvability remains future scope. Wait for the user's next instruction to begin implementation; this planning session ends before scaffolding.
+Implementation is authorized. Use the confirmed rules above, finalize numeric limits and statistics labels, and keep acceptance criteria aligned. Guaranteed solvability remains future scope. Exact arithmetic uses BigInt fractions, at most 4096 bits per numerator/denominator, and integer exponents with absolute value at most 1024; reject oversized work before allocating huge values.
 
 Deliverable: agreed rules and a concrete implementation scope.
 
@@ -96,7 +119,7 @@ Deliverable: a running shell and stable interfaces that allow parallel work.
 
 **Worker 1: engine.** Implement unique deck draws, arithmetic normalization and validation, safe exponentiation, expression ancestry, immutable merges, undo state support, and win detection. Supply deterministic examples and targeted engine checks.
 
-**Worker 2: play screen.** Implement card rendering, the ordered selection state machine, all five operation buttons, bounded random placement, responsive reflow, merge animation, keyboard controls, timer display, invalid-operation feedback, Give up confirmation and summary, and win presentation. Use fixtures until the engine is connected.
+**Worker 2: play screen.** Implement card rendering, the ordered selection state machine, all five operation buttons, bounded random placement, responsive reflow, merge particles and animation, keyboard controls, timer display, invalid-operation feedback, Restart/New hand/Give up controls, and terminal presentation. Own play-specific CSS; use shared design tokens. The lead owns confirmation dialogs and lifecycle transitions. Use fixtures until the engine is connected.
 
 **Worker 3: menus and stats.** Implement main menu navigation, playing card setting, validated local storage, once-per-run outcome recording, interrupted-run reconciliation, success rate, winning-time and give-up-time calculations, history/empty states, and reset confirmation. Coordinate run lifecycle events with the lead.
 
@@ -118,7 +141,7 @@ Deliverable: source, run instructions, build output workflow, and a public URL i
 
 ## Acceptance and validation plan
 
-These are future implementation checks, not work to perform during this planning session.
+These are the targeted implementation checks for the authorized build.
 
 - A deal has eight distinct source identities, all with values in 1–13; repeated ranks are accepted.
 - Each successful merge removes two active cards and adds one new card with a unique ID. Selecting the same card twice cannot merge it with itself.
@@ -128,6 +151,8 @@ These are future implementation checks, not work to perform during this planning
 - Exercise a deterministic winning fixture through seven merges. The hand A♠, 2♠, 3♠, 4♠, 5♠, 6♠, 10♠, K♠ has the solution `((13 − 10) × ((6 + 4) + 5)) ^ ((3 + 1) − 2) = 45² = 2025`. Every source card is used exactly once.
 - Verify the exact click order, selection changes, cancellation, toolbar behavior, rapid repeated input, invalid-operation recovery, and absence of duplicate merge commits during animations.
 - Check new card bounds and overlap prevention, narrow screens, resizing, long fractions, keyboard operation, screen reader announcements, and reduced motion.
+- Verify successful merges produce one bounded particle burst, invalid operations produce none, decorative layers never intercept input, and particles are cleaned up. Reduced motion suppresses burst travel.
+- Verify Restart restores the original hand, clears undo/selection, starts a fresh attempt, and records the prior active attempt once as abandoned. Canceling Restart preserves the board and timer. New hand is a separate action; restarting a completed run does not change its outcome.
 - Verify timer start/stop, background time, undo continuity, abandonment, and once-only outcome recording.
 - Verify Give up cancellation preserves play, confirmation stops timing and records one give-up, repeated clicks do not duplicate it, and undo/merge controls cannot alter a finished run. Exercise competing win/give-up events so one attempt has exactly one terminal outcome.
 - Verify success rate for no ended runs, wins only, give-ups only, and mixed wins/give-ups/abandonments. Active runs do not affect it; reload reconciliation does not duplicate an outcome.
@@ -138,10 +163,10 @@ These are future implementation checks, not work to perform during this planning
 
 ## Deferred scope
 
-Online accounts, cloud saves, leaderboards, multiplayer, daily challenges, hints, replay sharing, and additional operation sets are outside the proposed initial scope.
+Online accounts, cross-device login, leaderboards, multiplayer, daily challenges, hints, replay sharing, and additional operation sets are outside the proposed initial scope. Backend database persistence is now included.
 
 Guaranteed solvable deals are a desired future milestone. Evaluate a solver versus a curated or generated library of validated hands, validate each solution using the same exact arithmetic engine, and consider computation cost and hand diversity. Initial random deals must not be described as guaranteed solvable.
 
 ## Planning handoff
 
-`AGENTS.md` defines execution boundaries and team coordination. This document defines product behavior, open decisions, implementation sequence, and acceptance criteria. Stop after these documents are ready; wait for the next implementation instruction.
+`AGENTS.md` defines execution boundaries and team coordination. This document defines confirmed product behavior, design direction, implementation sequence, and acceptance criteria. Implementation is authorized; keep this plan updated with integration results and known limitations.
