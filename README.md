@@ -1,5 +1,7 @@
 # 2025 — The Numbers Table
 
+**Play online: https://game-2025.onrender.com/** (free hosting can take time to wake).
+
 A browser arithmetic game on a green felt table. Draw eight distinct cards from a standard deck, then combine them into exactly **2025** using addition, subtraction, multiplication, division, and exponentiation.
 
 Expand **Game settings** on the starting screen to choose **2–52 cards** and a **positive integer target**. Apply saves the preference; Standard 2025 restores eight cards and target 2025. Configuration is fixed for each attempt, and winning always requires using every starting card. Targets remain exact strings rather than JavaScript floating-point numbers, up to the existing 4096-bit arithmetic limit.
@@ -70,7 +72,7 @@ Separate development commands are `npm run dev:web` and `npm run dev:api`. Front
 
 The selected setup is **Render Free + Neon Free**. [DEPLOYMENT.md](DEPLOYMENT.md) explains setup, private credentials, migrations, limits, and verification. `render.yaml` defines one explicitly free Node web service, with Neon provisioned separately. No paid resources or payment details are authorized. The production server serves both the API and `dist/`; production requires `DATABASE_URL` instead of falling back to the development database.
 
-Versioned SQL migrations run transactionally at backend startup. The local and hosted database adapters use the same schema and parameterized queries. Hosted PostgreSQL has not been exercised against a real provider yet. See [server/README.md](server/README.md) for environment variables and API details.
+Versioned SQL migrations run transactionally at backend startup. The local and hosted database adapters use the same schema and parameterized queries. Neon connectivity, settings/results, player isolation, secure cookies and persistence across a Render redeployment have been verified. See [server/README.md](server/README.md) for environment variables and API details.
 
 Migration 002 adds configuration to settings and runs while preserving existing records with standard-game defaults. Run-start and finish retries must match the same configuration.
 

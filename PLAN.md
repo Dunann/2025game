@@ -10,6 +10,63 @@ The statistics screen shows wins, best winning time, the average time of the lat
 
 ## Requirements and decisions
 
+### Next fix: optional exponentiation (planned, not implemented)
+
+The latest request makes exponentiation an opt-in Game settings option, **off by
+default**. This section supersedes prior always-enabled/five-operation assumptions
+for new games after implementation. The live version still permits powers.
+
+**Contracts and compatibility — lead first**
+
+- Add required `exponentiationEnabled: boolean` to normalized `GameConfig`; new
+  settings and the standard eight-card/2025 preset default to `false`.
+- Introduce explicit normalization contexts. Missing flags on historical runs,
+  active runs, old cached records and queued start/finish commands mean `true`,
+  because those attempts allowed powers. Missing new settings mean `false`.
+  Legacy display/settings updates must preserve an existing saved preference.
+  Reject present but malformed flag values.
+- Snapshot the choice at run start; never derive a run's rule from later settings.
+  Include it in configuration identity, start/finish matching and statistics keys.
+- Standard statistics become eight cards / 2025 / powers off. Retain existing
+  power-enabled 2025 results as an explicitly labeled variation. Group all
+  variations by card count, canonical target and power flag.
+
+**Three workers after the contracts are established**
+
+1. `/root/engine`: centralize allowed operations and reject powers in disabled
+   games before mutating cards, history or revision. Preserve power expressions
+   and existing exponent/magnitude checks when enabled. Update the powered win
+   fixture to opt in explicitly.
+2. `/root/play`: add an unchecked "Allow exponentiation" option inside Game
+   settings, persisted through Apply. Render four or five controls from the run's
+   snapshot, with responsive layouts. Hide the power button and G hint and ignore
+   G when disabled. Both merge orders must work when enabled. Show power rules
+   only when applicable; retain the concise interface and accessible labels.
+3. `/root/operations_refresh`: add migration `003` without rewriting 001/002.
+   Backfill existing runs as enabled (`DEFAULT true` while adding the column),
+   then change the new-run SQL default to false. Settings default off. Update
+   settings/profile/start/finish SQL, API validation, cache/outbox recovery and
+   statistics grouping. Keep identical retries idempotent and reject rule changes
+   for an existing run with 409.
+
+**Integration and acceptance — lead**
+
+- Fresh settings and the standard preset use powers off; either choice survives
+  Apply, reload and backend restart. Starting a run freezes its operation policy.
+- Off means exactly four buttons, no G shortcut/help hint and an engine-level
+  rejection of direct power calls without state changes or particles.
+- On means five buttons, G support through both selection orders, and unchanged
+  exact arithmetic limits. Both toolbars fit 320px with accessible touch targets.
+- Existing outcomes, times, active runs and queued writes retain their original
+  power-enabled meaning after migration. Old settings updates preserve preference.
+- Otherwise identical games with different operation policies never share stats.
+- Run focused engine/keyboard/storage/API/migration checks, the production build,
+  and a browser smoke check. Review and push a working checkpoint; deploy only
+  after the migration and compatibility checks pass.
+
+Planning review completed by all three reused workers; no exponentiation code
+changes were made during this planning phase.
+
 ### Confirmed requirements
 
 - A standalone website hosting the game, with a main menu, game screen, and statistics screen.
@@ -284,7 +341,7 @@ Guaranteed solvable deals are a desired future milestone. Evaluate a solver vers
 
 ### Remaining scope and limits
 
-- No hosted database/provider instance or public deployment has been created or tested. External PostgreSQL uses the tested SQL schema but still needs a real-provider check when selected.
+- Public deployment is now verified on Render Free + Neon Free at https://game-2025.onrender.com/. Live settings/results, session isolation, cookie attributes and persistence across a Render redeploy passed. See `DEPLOYMENT.md` for resources and validation. No payment information or paid resources were added.
 - Accounts, cross-device login, competitive score validation, multiplayer, and guaranteed solvable hands remain future work.
 - Personal records use an anonymous browser cookie. Only one app tab can own a session. Unsent API operations survive a same-tab reload when session storage is available; closing the tab can lose unsent operations. Save status makes this visible.
 - Local development and all completed work require no paid database service. See `README.md` for startup and `server/README.md` for database configuration.

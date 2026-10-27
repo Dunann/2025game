@@ -68,8 +68,28 @@ available. `npm ci --include=dev` includes the TypeScript/Vite build tools.
 6. Verify the cookie is HttpOnly, Secure, and SameSite=Lax.
 7. Confirm both dashboards still show free plans and no payment method.
 
-This is a verification checklist, not a claim that cloud deployment has
-finished. Record the actual URL and results after account connections succeed.
+## Deployment verified October 27, 2026
+
+- Public game: **https://game-2025.onrender.com/**
+- Render service: `game-2025`, Free, service ID `srv-dbggq06i0phs73cb8k10`.
+- Render Blueprint: `exs-dbggph29lscs73f4g4m0`; application commit `3140df8`.
+- Neon project: `2025-game`, Free, ID `red-unit-07942147`, AWS Ohio.
+- Database/branch: `game2025` / `production` (`br-quiet-lab-b59ktmsr`).
+- Compute is 0.25 CU; the Free plan enforces five-minute autosuspend. Render
+  uses the default TCP check, so health polling does not wake PostgreSQL.
+- Backend startup completed migrations and reported `postgres`. Live API checks
+  passed for database health, settings, start/give-up, duplicate-finish safety,
+  separate players and cross-origin rejection. Cookie attributes were checked
+  as Secure, HttpOnly and SameSite=Lax.
+- Redeployment `dep-dbgh6bgm7kps73dd7afg` became live; the same isolated test
+  player's configuration, preference and run survived the application restart.
+- Browser verification opened the public main menu and confirmed saved status.
+- No payment details, paid plan, disk, Render database or custom domain were added.
+
+Only identifiers and URLs above are public configuration; the database password
+exists in Render's private environment settings. Initial setup attempts failed
+while transferring the URL; the endpoint and refreshed credential were corrected
+and verified before the successful deployment. Local statistics remain local.
 
 ## Limits and maintenance
 

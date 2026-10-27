@@ -2,11 +2,36 @@
 
 ## Current authorization
 
-Implementation is now authorized. The user requested that the initial planning documents be pushed first, then updated with a green felt poker-table design, merge particles, and a Restart button, followed by implementation by a lead and three workers. The initial planning documents were pushed in commit `46237e3`. Build and validate locally in this repository; public hosting remains a later delivery decision.
+Implementation is authorized. The initial planning documents were pushed in commit `46237e3`, followed by the first draft and subsequent UI/configuration changes. Public deployment is now authorized on **Render Free + Neon Free**. Never add payment details, paid resources or upgrades. The latest optional-exponentiation request below is a planning handoff.
 
 Read `PLAN.md` before starting work. Treat its proposed defaults as provisional where decisions remain open. User answers override those defaults; update the plan when answers arrive.
 
-## Product
+## Next change: optional exponentiation (planning only)
+
+The user requested completion of the cloud database connection, then a plan and
+agent assignments for making exponentiation opt-in and **off by default**. The
+planning workers have reviewed the current implementation; do not implement this
+change as part of the planning handoff. The detailed sequence is in `PLAN.md`.
+This newer requirement supersedes earlier five-operation defaults once implemented.
+
+| Agent | Implementation ownership when execution begins |
+| --- | --- |
+| Lead (`/root`) | `src/types.ts`, `src/config.ts`, `src/App.tsx`, shared normalization contracts, integration, docs, deployment and Git |
+| Engine (`/root/engine`) | `src/game/**`, exact-rule enforcement and engine checks |
+| UI (`/root/play`) | `src/features/menu/**`, `src/features/play/**`, `src/features/rules/**`, UI/keyboard checks |
+| Records/backend (`/root/operations_refresh`) | `server/**`, migration 003, `src/storage/**`, `src/features/stats/**`, persistence and grouping checks |
+
+Reuse these agents for their existing areas. Establish the required boolean
+`exponentiationEnabled` and separate new-settings versus legacy-run normalization
+before independent implementation. Only the lead edits shared contracts. Treat
+missing flags on historical runs/outbox commands as enabled; new settings default
+off. Include the flag in immutable run snapshots and statistics identity. Never
+relabel old runs by applying the new default retroactively.
+
+Prefer delegation for bounded, independent work. Keep worker output concise,
+avoid duplicate file ownership, and collect targeted checks before integrating.
+
+## Current product
 
 Build a browser game with a starting menu, a play screen, and a statistics screen. The standard game uses eight distinct cards and target 2025. Main-menu settings allow 2–52 cards from the standard deck and a positive integer target within the 4096-bit exact-arithmetic bound. Card values are 1–13; repeated ranks are allowed when the physical cards differ.
 
