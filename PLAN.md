@@ -66,6 +66,24 @@ These defaults can be adjusted during implementation without changing the core p
 
 Use a TypeScript React/Vite browser application with responsive CSS, plus a Node/Express backend and PostgreSQL database. The user expanded scope during implementation to include a backend database in preparation for online play. Browser storage is now a cache, not the primary record store.
 
+### Free public deployment
+
+Render Free and Neon Free are now selected and deployment is authorized. Do not
+enter payment information or enable paid resources. The lead owns `render.yaml`,
+deployment documentation, account setup, and final verification. Workers own
+PostgreSQL adapter hardening, API request/session limits, and a read-only
+production review. Keep the website and API on one HTTPS origin. Use Render's
+TCP health check so Neon can sleep. Account connections are required before
+creating resources; code preparation proceeds independently. See `DEPLOYMENT.md`
+for setup and acceptance checks. Local statistics are not automatically migrated.
+
+Preparation validation: 173 tests across 14 files and the production build pass.
+Added handled PostgreSQL pool errors, a bounded connection timeout, safe rollback
+cleanup, and per-process API/new-session limits. The Blueprint explicitly selects
+the Free web service and prompts for the database secret. Actual cloud creation,
+Neon migrations, HTTPS session checks, and persistence across deployment await
+connected provider accounts; no cloud deployment is claimed yet.
+
 ### Backend and database scope
 
 - Persist anonymous players, settings, runs, terminal outcomes, and active-run markers in relational PostgreSQL tables with versioned migrations, foreign keys, unique run IDs, and validation constraints.

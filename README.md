@@ -66,9 +66,9 @@ The build checks client and server TypeScript and produces the website in `dist/
 
 Separate development commands are `npm run dev:web` and `npm run dev:api`. Frontend changes reload automatically; restart after backend changes. Stop `npm run dev` with Ctrl+C and wait for shutdown to finish: the runner closes the API database before stopping the frontend. Avoid forced process termination while the database is open. `npm run preview` serves the built frontend through Vite; it still needs the API running separately. `npm start` runs the backend without watch mode.
 
-## Future online deployment
+## Online deployment
 
-The database provider remains undecided and no paid resources have been created. For hosted deployment, supply a PostgreSQL `DATABASE_URL`, set `NODE_ENV=production`, build the frontend, and run `npm start`. The production server serves both the API and `dist/`; use HTTPS and configure the listener and trusted proxy for your host. Production fails fast without a PostgreSQL connection instead of using the development database.
+The selected setup is **Render Free + Neon Free**. [DEPLOYMENT.md](DEPLOYMENT.md) explains setup, private credentials, migrations, limits, and verification. `render.yaml` defines one explicitly free Node web service, with Neon provisioned separately. No paid resources or payment details are authorized. The production server serves both the API and `dist/`; production requires `DATABASE_URL` instead of falling back to the development database.
 
 Versioned SQL migrations run transactionally at backend startup. The local and hosted database adapters use the same schema and parameterized queries. Hosted PostgreSQL has not been exercised against a real provider yet. See [server/README.md](server/README.md) for environment variables and API details.
 

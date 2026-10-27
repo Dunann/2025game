@@ -1,0 +1,23 @@
+# Neon is provisioned separately on its Free plan. No Render database or disk.
+services:
+  - type: web
+    name: game-2025
+    runtime: node
+    plan: free
+    region: ohio
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    # Default TCP health check lets Neon sleep; /api/health queries the DB.
+    envVars:
+      - key: NODE_VERSION
+        value: 24.13.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATABASE_URL
+        sync: false

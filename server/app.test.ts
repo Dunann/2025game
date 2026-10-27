@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import type { StoredData } from '../src/types';
-import { createApp } from './app';
+import { createApp, type AppOptions } from './app';
 import { createDatabase, type Database } from './database';
 
 const standardConfig = { cardCount: 8, target: '2025' };
@@ -195,6 +195,87 @@ describe('database-backed HTTP API', () => {
     const maximumTarget = ((1n << 4096n) - 1n).toString();
     expect((await request('/api/settings', 'PUT', { playingCardMode: false, gameConfig: { cardCount: 52, target: maximumTarget } })).status).toBe(200);
     expect((await (await request('/api/profile')).json() as StoredData).settings.gameConfig?.target).toBe(maximumTarget);
+  });
+});
+
+describe('public API request limits', () => {
+  let db: Database;
+  beforeAll(async () => { db = await createDatabase({ dataDir: 'memory://' }); }, 30000);
+  afterAll(async () => { if (db) await db.close(); });
+  async function withApp(options: AppOptions, check: (origin: string) => Promise<void>) {
+    const server = createApp(db, options).listen(0, '127.0.0.1');
+    try {
+      await once(server, 'listening');
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Expected TCP server.');
+      await check(`http://127.0.0.1:${address.port}`);
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  }
+
+  it('excludes health checks and rejects excessive profile requests before creating players', async () => {
+    const before = Number((await db.query('SELECT count(*) AS count FROM players')).rows[0].count);
+    await withApp({ rateLimit: { maxRequests: 2, windowMs: 10_000, now: () => 0 } }, async origin => {
+      for (let i = 0; i < 3; i++) {
+        const health = await fetch(`${origin}/api/health`);
+        expect(health.status).toBe(200);
+        expect(health.headers.get('set-cookie')).toBeNull();
+      }
+      expect((await fetch(`${origin}/api/profile`)).status).toBe(200);
+      expect((await fetch(`${origin}/api/profile`)).status).toBe(200);
+      const blocked = await fetch(`${origin}/api/profile`);
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.get('retry-after')).toBe('10');
+      expect(blocked.headers.get('cache-control')).toBe('no-store');
+      expect(blocked.headers.get('set-cookie')).toBeNull();
+      expect(await blocked.json()).toEqual({ error: expect.stringContaining('Too many requests') });
+      expect((await fetch(`${origin}/api/health`)).status).toBe(200);
+    });
+    expect(Number((await db.query('SELECT count(*) AS count FROM players')).rows[0].count)).toBe(before + 2);
+  });
+
+  it('bounds new anonymous sessions even with forged cookies while allowing existing-session gameplay', async () => {
+    const before = Number((await db.query('SELECT count(*) AS count FROM players')).rows[0].count);
+    await withApp({ rateLimit: { maxRequests: 20, maxNewSessions: 1 } }, async origin => {
+      const profile = await fetch(`${origin}/api/profile`);
+      const cookie = profile.headers.get('set-cookie')!.split(';')[0];
+      const headers = { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json' };
+      expect((await fetch(`${origin}/api/profile`, { headers })).status).toBe(200);
+      expect((await fetch(`${origin}/api/settings`, { method: 'PUT', headers, body: JSON.stringify({ playingCardMode: true }) })).status).toBe(200);
+      const run = { id: 'limited-normal-run', startedAt: 100 };
+      expect((await fetch(`${origin}/api/runs/start`, { method: 'POST', headers, body: JSON.stringify(run) })).status).toBe(200);
+      expect((await fetch(`${origin}/api/runs/finish`, { method: 'POST', headers, body: JSON.stringify({ ...run, outcome: 'given_up', endedAt: 200, elapsedMs: 100 }) })).status).toBe(200);
+      const anonymousHeaders: Record<string, string>[] = [{}, { Cookie: `game2025_session=${'a'.repeat(64)}` }];
+      for (const extra of anonymousHeaders) {
+        const blocked = await fetch(`${origin}/api/profile`, { headers: extra });
+        expect(blocked.status).toBe(429);
+        expect(blocked.headers.get('set-cookie')).toBeNull();
+        expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
+      }
+      expect((await fetch(`${origin}/api/profile`, { headers })).status).toBe(200);
+    });
+    expect(Number((await db.query('SELECT count(*) AS count FROM players')).rows[0].count)).toBe(before + 1);
+  });
+
+  it('keeps tracked IP memory bounded without evicting active budgets and recovers after expiry', async () => {
+    let now = 0;
+    await withApp({ trustProxy: true, rateLimit: { maxRequests: 1, maxEntries: 1, windowMs: 1000, now: () => now } }, async origin => {
+      const request = (ip: string) => fetch(`${origin}/api/profile`, { headers: { 'X-Forwarded-For': ip } });
+      expect((await request('192.0.2.1')).status).toBe(200);
+      expect((await request('192.0.2.2')).status).toBe(429);
+      expect((await request('192.0.2.1')).status).toBe(429);
+      now = 1001;
+      expect((await request('192.0.2.2')).status).toBe(200);
+      expect((await request('192.0.2.2')).status).toBe(429);
+    });
+  });
+
+  it('ignores spoofed forwarded IPs unless proxy trust is explicitly enabled', async () => {
+    await withApp({ trustProxy: false, rateLimit: { maxRequests: 1 } }, async origin => {
+      expect((await fetch(`${origin}/api/profile`, { headers: { 'X-Forwarded-For': '192.0.2.1' } })).status).toBe(200);
+      expect((await fetch(`${origin}/api/profile`, { headers: { 'X-Forwarded-For': '192.0.2.2' } })).status).toBe(429);
+    });
   });
 });
 

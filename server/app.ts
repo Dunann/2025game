@@ -5,7 +5,14 @@ import type { ActiveRun, GameConfig, RunRecord, Settings, StoredData } from '../
 import { gameConfigKey, getGameConfig, parseGameConfig } from '../src/config';
 import type { Database, Transaction } from './database';
 
-export interface AppOptions { production?: boolean; allowedOrigins?: string[]; staticDir?: string; trustProxy?: boolean }
+interface RateLimitOptions {
+  windowMs: number;
+  maxRequests: number;
+  maxNewSessions: number;
+  maxEntries: number;
+  now: () => number;
+}
+export interface AppOptions { production?: boolean; allowedOrigins?: string[]; staticDir?: string; trustProxy?: boolean; rateLimit?: Partial<RateLimitOptions> }
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 const COOKIE = 'game2025_session';
 const SESSION_MS = 365 * 24 * 60 * 60 * 1000;
@@ -55,6 +62,49 @@ export function createApp(db: Database, options: AppOptions = {}) {
     res.setHeader('Referrer-Policy', 'same-origin');
     next();
   });
+  // These per-process limits protect both database traffic and anonymous-player
+  // creation. Count every API request before parsing bodies or looking up cookies.
+  const limits: RateLimitOptions = { windowMs: 10 * 60 * 1000, maxRequests: 600, maxNewSessions: 30, maxEntries: 10_000, now: () => performance.now(), ...options.rateLimit };
+  for (const key of ['windowMs', 'maxRequests', 'maxNewSessions', 'maxEntries'] as const) {
+    if (!Number.isSafeInteger(limits[key]) || limits[key] < 1) throw new Error(`rateLimit.${key} must be a positive safe integer.`);
+  }
+  type Budget = { expiresAt: number; requests: number; sessions: number };
+  const budgets = new Map<string, Budget>();
+  const rejectRateLimit = (res: Response, expiresAt: number, now: number) => {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((expiresAt - now) / 1000))));
+    res.status(429).json({ error: 'Too many requests. Please wait before trying again.' });
+  };
+  app.use('/api', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if ((req.path === '/health' || req.path === '/health/') && ['GET', 'HEAD'].includes(req.method)) return next();
+    const now = limits.now();
+    // Entries are inserted in expiry order. Prune at most 32 per request, with
+    // no background timer and no unbounded scan under changing source addresses.
+    let cleaned = 0;
+    for (const [key, budget] of budgets) {
+      if (budget.expiresAt > now || cleaned === 32) break;
+      budgets.delete(key);
+      cleaned++;
+    }
+    const address = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    // Keep map keys bounded even if a trusted proxy forwards a malformed value.
+    const key = address.length > 128 ? createHash('sha256').update(address).digest('hex') : address;
+    let budget = budgets.get(key);
+    if (budget && budget.expiresAt <= now) { budgets.delete(key); budget = undefined; }
+    if (!budget) {
+      if (budgets.size >= limits.maxEntries) {
+        const earliest = budgets.values().next().value as Budget | undefined;
+        rejectRateLimit(res, earliest?.expiresAt ?? now + limits.windowMs, now);
+        return;
+      }
+      budget = { expiresAt: now + limits.windowMs, requests: 0, sessions: 0 };
+      budgets.set(key, budget);
+    }
+    if (budget.requests >= limits.maxRequests) { rejectRateLimit(res, budget.expiresAt, now); return; }
+    budget.requests++;
+    res.locals.rateBudget = budget;
+    next();
+  });
   app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -80,6 +130,14 @@ export function createApp(db: Database, options: AppOptions = {}) {
       playerId = session.rows[0]?.player_id as string | undefined;
     }
     if (!playerId) {
+      const budget = res.locals.rateBudget as Budget;
+      if (budget.sessions >= limits.maxNewSessions) {
+        rejectRateLimit(res, budget.expiresAt, limits.now());
+        return;
+      }
+      // Increment synchronously before awaiting inserts so concurrent requests
+      // without a valid session cannot all pass the same remaining allowance.
+      budget.sessions++;
       playerId = randomUUID();
       const token = randomBytes(32).toString('hex');
       const hash = createHash('sha256').update(token).digest('hex');

@@ -36,7 +36,12 @@ export async function createDatabase(options: { connectionString?: string; dataD
   const connectionString = options.connectionString ?? process.env.DATABASE_URL;
   let db: Database;
   if (connectionString) {
-    const pool = new pg.Pool({ connectionString, max: 10 });
+    const pool = new pg.Pool({ connectionString, max: 10, connectionTimeoutMillis: 15_000 });
+    // Suspended cloud databases can close idle sockets. pg removes the broken
+    // connection itself; an error listener prevents an unhandled EventEmitter error.
+    pool.on('error', error => {
+      console.error('An idle PostgreSQL connection failed.', { code: (error as Error & { code?: string }).code ?? 'unknown' });
+    });
     db = {
       kind: 'postgres',
       query: async (sql, parameters = []) => {
@@ -45,6 +50,7 @@ export async function createDatabase(options: { connectionString?: string; dataD
       },
       transaction: async work => {
         const client = await pool.connect();
+        let discard: Error | undefined;
         try {
           await client.query('BEGIN');
           const result = await work({ query: async (sql, parameters = []) => {
@@ -55,9 +61,13 @@ export async function createDatabase(options: { connectionString?: string; dataD
           await client.query('COMMIT');
           return result;
         } catch (error) {
-          await client.query('ROLLBACK');
+          try { await client.query('ROLLBACK'); }
+          catch (rollbackError) {
+            // Preserve the original failure and prevent reuse of a broken client.
+            discard = rollbackError instanceof Error ? rollbackError : new Error('PostgreSQL rollback failed.');
+          }
           throw error;
-        } finally { client.release(); }
+        } finally { if (discard) client.release(discard); else client.release(); }
       },
       close: () => pool.end(),
     };
