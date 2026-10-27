@@ -4,7 +4,8 @@ import type { GameState, Operation, RunOutcome } from '../../types';
 import { OPERATION_LABELS, OPERATION_NAMES } from '../../types';
 import { formatDuration } from '../../format';
 import { formatExpression, formatValue } from '../../game';
-import { OPERATION_CONTROLS, playKeyAction } from './keyboard';
+import { getOperationControls, playKeyAction } from './keyboard';
+import { isOperationAllowed } from '../../config';
 import { EMPTY_SELECTION, transitionSelection } from './selection';
 import { RulesContent } from '../rules/RulesContent';
 import type { SelectionAction } from './selection';
@@ -40,6 +41,7 @@ export function PlayScreen(props: PlayScreenProps) {
   const firstCard = game.cards.find(card => card.id === firstId);
   const secondCard = game.cards.find(card => card.id === secondId);
   const finished = outcome !== null;
+  const operationControls = getOperationControls(game.config);
 
   useLayoutEffect(() => {
     const ids = game.cards.map(card => card.id);
@@ -77,17 +79,18 @@ export function PlayScreen(props: PlayScreenProps) {
       const target = event.target instanceof Element ? event.target : null;
       const editing = !!target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
       const blocked = editing || !!screen.current?.closest('[inert], [aria-hidden="true"]') || !!screen.current?.querySelector('.play-help[open]') || !!document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
-      const action = playKeyAction(event, { active: !finished, hasFirstCard: !!firstCard, blocked });
+      const action = playKeyAction(event, { active: !finished, hasFirstCard: !!firstCard, blocked, config: game.config });
       if (action === null) return;
       event.preventDefault();
       select(action === 'clear' ? { kind: 'clear' } : { kind: 'operation', operation: action });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [finished, firstCard, selection, onMerge]);
+  }, [finished, firstCard, selection, onMerge, game.config]);
 
   function select(action: SelectionAction) {
     if (finished) return;
+    if (action.kind === 'operation' && !isOperationAllowed(action.operation, game.config)) return;
     const next = transitionSelection(selection, action);
     setSelection(next.selection);
     if (next.merge) onMerge(next.merge.firstId, next.merge.operation, next.merge.secondId);
@@ -141,8 +144,8 @@ export function PlayScreen(props: PlayScreenProps) {
       <div className="pending-selection" aria-live="polite"><span className="sr-only">{instruction}</span>
         {firstCard && <p className="pending-expression"><span className="first-operand">{formatValue(firstCard.value, playingCardMode)}</span><span className="pending-symbol">{operation ? OPERATION_LABELS[operation] : '·'}</span><span className="second-operand">{secondCard ? formatValue(secondCard.value, playingCardMode) : '?'}</span></p>}
       </div>
-      <div className="operation-buttons" role="group" aria-label="Choose an operation">
-        {OPERATION_CONTROLS.map(({ operation: op, key }) => <div className="operation-control" key={op}>
+      <div className="operation-buttons" role="group" aria-label="Choose an operation" style={{ '--operation-count': operationControls.length } as CSSProperties}>
+        {operationControls.map(({ operation: op, key }) => <div className="operation-control" key={op}>
           <button className={`button operation-button${operation === op ? ' is-selected' : ''}`} disabled={!firstCard}
             aria-label={OPERATION_NAMES[op]} aria-pressed={operation === op} aria-keyshortcuts={key} aria-describedby={`operation-shortcut-${op}`}
             onClick={() => select({ kind: 'operation', operation: op })}>{OPERATION_LABELS[op]}</button>

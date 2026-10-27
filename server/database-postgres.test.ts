@@ -46,7 +46,7 @@ describe('hosted PostgreSQL adapter', () => {
     expect(calls[1][0]).toBe('SELECT pg_advisory_xact_lock(2025, 1)');
     expect(calls.some(([sql]) => String(sql).includes('CREATE TABLE IF NOT EXISTS players'))).toBe(true);
     expect(calls.some(([sql]) => String(sql).includes('ALTER TABLE settings'))).toBe(true);
-    expect(calls.filter(([sql]) => String(sql).startsWith('INSERT INTO schema_migrations')).map(([, params]) => params)).toEqual([[1], [2]]);
+    expect(calls.filter(([sql]) => String(sql).startsWith('INSERT INTO schema_migrations')).map(([, params]) => params)).toEqual([[1], [2], [3]]);
     expect(calls.at(-1)![0]).toBe('COMMIT');
     expect(client.release).toHaveBeenCalledOnce();
     await db.close();

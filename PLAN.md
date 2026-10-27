@@ -1,6 +1,6 @@
 # 2025 game implementation plan
 
-Status: first draft implemented and validated locally. Initial planning documents were pushed to `origin/main` in commit `46237e3`; working source was pushed in `8ac523e`. The primary agent served as lead with three workers. Public hosting and provider selection remain future work.
+Status: live on Render Free + Neon Free. Optional exponentiation is implemented and checked locally with a lead and three reused workers; deployment verification follows the integration checkpoint.
 
 ## Intended experience
 
@@ -10,11 +10,12 @@ The statistics screen shows wins, best winning time, the average time of the lat
 
 ## Requirements and decisions
 
-### Next fix: optional exponentiation (planned, not implemented)
+### Current fix: optional exponentiation (implemented)
 
 The latest request makes exponentiation an opt-in Game settings option, **off by
 default**. This section supersedes prior always-enabled/five-operation assumptions
-for new games after implementation. The live version still permits powers.
+for new games. Implementation is authorized; the deployed version will change
+after integration checks pass.
 
 **Contracts and compatibility — lead first**
 
@@ -43,8 +44,9 @@ for new games after implementation. The live version still permits powers.
    G when disabled. Both merge orders must work when enabled. Show power rules
    only when applicable; retain the concise interface and accessible labels.
 3. `/root/operations_refresh`: add migration `003` without rewriting 001/002.
-   Backfill existing runs as enabled (`DEFAULT true` while adding the column),
-   then change the new-run SQL default to false. Settings default off. Update
+   Backfill existing runs as enabled and retain the run-column SQL default of
+   true for an old server inserting during a rolling deploy. New writers supply
+   the explicit rule flag; new-game settings default off. Update
    settings/profile/start/finish SQL, API validation, cache/outbox recovery and
    statistics grouping. Keep identical retries idempotent and reject rule changes
    for an existing run with 409.
@@ -64,8 +66,16 @@ for new games after implementation. The live version still permits powers.
   and a browser smoke check. Review and push a working checkpoint; deploy only
   after the migration and compatibility checks pass.
 
-Planning review completed by all three reused workers; no exponentiation code
-changes were made during this planning phase.
+Planning review completed by all three reused workers. The same workers now own
+engine enforcement, menu/play controls, and backend/records implementation.
+
+Validation: all **188 tests across 15 files** pass and the production build passes.
+Isolated browser checks confirmed the default unchecked checkbox, four controls,
+ignored G while off, opt-in persistence across reload, five controls and a working
+two-card G merge when on, separate Powers off/on statistics, and Standard 2025
+resetting the preference off. Both toolbar layouts fit 320px without horizontal
+overflow and all operation buttons exceed 44px width. Migration checks cover
+preservation of legacy outcomes and old clients during a rolling deployment.
 
 ### Confirmed requirements
 

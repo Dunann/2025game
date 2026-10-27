@@ -1,5 +1,5 @@
 import type { ActiveCard, Expression, GameConfig, GameState, GameValue, MergeResult, Operation, SourceCard } from '../types';
-import { getGameConfig, MAX_CARD_COUNT, MIN_CARD_COUNT, parseGameConfig } from '../config';
+import { getGameConfig, isOperationAllowed, MAX_CARD_COUNT, MIN_CARD_COUNT, parseGameConfig } from '../config';
 
 const MAX_BITS = 4096;
 const MAX_EXPONENT = 1024n;
@@ -91,6 +91,7 @@ export function createGame(hand?: SourceCard[], config?: GameConfig): GameState 
 }
 
 export function mergeCards(state: GameState, firstId: string, operation: Operation, secondId: string): MergeResult {
+  if (!isOperationAllowed(operation, state.config)) return { ok: false, error: 'Exponentiation is disabled for this game.' };
   if (firstId === secondId) return { ok: false, error: 'Choose two different cards.' };
   const first = state.cards.find(card => card.id === firstId);
   const second = state.cards.find(card => card.id === secondId);

@@ -14,7 +14,7 @@ describe('profile API client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/profile', expect.objectContaining({ method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, signal: expect.any(AbortSignal) }));
   });
   it('preserves configuration on profile loading and all write payloads', async () => {
-    const config = { cardCount: 4, target: '9007199254740993' };
+    const config = { cardCount: 4, target: '9007199254740993', exponentiationEnabled: false };
     const settings = { playingCardMode: true, gameConfig: config };
     const active = { id: 'variation', startedAt: 1, config };
     const record = { ...active, endedAt: 2, elapsedMs: 1, outcome: 'won' as const };

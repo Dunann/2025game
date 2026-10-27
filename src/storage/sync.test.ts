@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { finishRemoteRun, resetRemoteStats, saveRemoteSettings, startRemoteRun } from './api';
 import { createSaveQueue, OUTBOX_KEY } from './sync';
+import { LEGACY_GAME_CONFIG } from '../config';
 
 vi.mock('./api', () => ({ saveRemoteSettings: vi.fn(), startRemoteRun: vi.fn(), finishRemoteRun: vi.fn(), resetRemoteStats: vi.fn() }));
 
@@ -60,8 +61,8 @@ describe('ordered save outbox', () => {
     expect(resetRemoteStats).toHaveBeenCalledTimes(1);
   });
   it('restores and canonicalizes settings and run configurations without losing legacy saves', async () => {
-    const config = { cardCount: 52, target: '009007199254740993' };
-    const canonical = { cardCount: 52, target: '9007199254740993' };
+    const config = { cardCount: 52, target: '009007199254740993', exponentiationEnabled: false };
+    const canonical = { cardCount: 52, target: '9007199254740993', exponentiationEnabled: false };
     const run = { id: 'variation', startedAt: 1, config };
     const record = { ...run, outcome: 'won', endedAt: 10, elapsedMs: 9 };
     stored.set(OUTBOX_KEY, JSON.stringify({ version: 1, commands: [
@@ -72,25 +73,37 @@ describe('ordered save outbox', () => {
     expect(await createSaveQueue(vi.fn()).flush()).toBe(true);
     expect(saveRemoteSettings).toHaveBeenCalledWith({ playingCardMode: true, gameConfig: canonical });
     expect(startRemoteRun).toHaveBeenNthCalledWith(1, { ...run, config: canonical });
-    expect(startRemoteRun).toHaveBeenNthCalledWith(2, { id: 'legacy', startedAt: 2 });
+    expect(startRemoteRun).toHaveBeenNthCalledWith(2, { id: 'legacy', startedAt: 2, config: LEGACY_GAME_CONFIG });
     expect(finishRemoteRun).toHaveBeenCalledWith({ ...record, config: canonical });
   });
   it('snapshots nested configuration before callers can mutate an unsent command', async () => {
     vi.mocked(startRemoteRun).mockRejectedValue(new Error('Offline'));
     const queue = createSaveQueue(vi.fn());
-    const config = { cardCount: 4, target: '24' };
+    const config = { cardCount: 4, target: '24', exponentiationEnabled: false };
     queue.enqueue({ kind: 'start', run: { id: 'r', startedAt: 1, config } });
     expect(await queue.flush()).toBe(false);
     queue.enqueue({ kind: 'settings', settings: { playingCardMode: true, gameConfig: config } });
     queue.enqueue({ kind: 'finish', record: { id: 'r', startedAt: 1, endedAt: 2, elapsedMs: 1, outcome: 'won', config } });
     config.cardCount = 8; config.target = '2025';
     const commands = JSON.parse(stored.get(OUTBOX_KEY)!).commands;
-    expect(commands[0].run.config).toEqual({ cardCount: 4, target: '24' });
-    expect(commands[1].settings.gameConfig).toEqual({ cardCount: 4, target: '24' });
-    expect(commands[2].record.config).toEqual({ cardCount: 4, target: '24' });
+    expect(commands[0].run.config).toEqual({ cardCount: 4, target: '24', exponentiationEnabled: false });
+    expect(commands[1].settings.gameConfig).toEqual({ cardCount: 4, target: '24', exponentiationEnabled: false });
+    expect(commands[2].record.config).toEqual({ cardCount: 4, target: '24', exponentiationEnabled: false });
+  });
+  it('preserves missing power preference in old settings but snapshots legacy queued runs with powers on', async () => {
+    const config = { cardCount: 4, target: '00024' };
+    const run = { id: 'old-config', startedAt: 1, config };
+    stored.set(OUTBOX_KEY, JSON.stringify({ version: 1, commands: [
+      { kind: 'settings', settings: { playingCardMode: true, gameConfig: config } },
+      { kind: 'start', run }, { kind: 'finish', record: { ...run, endedAt: 2, elapsedMs: 1, outcome: 'won' } },
+    ] }));
+    expect(await createSaveQueue(vi.fn()).flush()).toBe(true);
+    expect(saveRemoteSettings).toHaveBeenCalledWith({ playingCardMode: true, gameConfig: { cardCount: 4, target: '24' } });
+    expect(startRemoteRun).toHaveBeenCalledWith({ ...run, config: { cardCount: 4, target: '24', exponentiationEnabled: true } });
+    expect(finishRemoteRun).toHaveBeenCalledWith({ ...run, endedAt: 2, elapsedMs: 1, outcome: 'won', config: { cardCount: 4, target: '24', exponentiationEnabled: true } });
   });
   it('drops malformed explicit configuration rather than replaying it as a standard attempt', async () => {
-    const config = { cardCount: 8, target: '1e3' };
+    const config = { cardCount: 8, target: '1e3', exponentiationEnabled: false };
     stored.set(OUTBOX_KEY, JSON.stringify({ version: 1, commands: [
       { kind: 'settings', settings: { playingCardMode: true, gameConfig: config } },
       { kind: 'start', run: { id: 'bad', startedAt: 1, config } },

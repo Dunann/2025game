@@ -15,6 +15,7 @@ export interface Database extends Transaction {
 const migrations = [
   { version: 1, path: new URL('./migrations/001_initial.sql', import.meta.url) },
   { version: 2, path: new URL('./migrations/002_game_config.sql', import.meta.url) },
+  { version: 3, path: new URL('./migrations/003_optional_exponentiation.sql', import.meta.url) },
 ];
 
 async function migrate(db: Database) {

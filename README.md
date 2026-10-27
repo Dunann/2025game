@@ -2,7 +2,7 @@
 
 **Play online: https://game-2025.onrender.com/** (free hosting can take time to wake).
 
-A browser arithmetic game on a green felt table. Draw eight distinct cards from a standard deck, then combine them into exactly **2025** using addition, subtraction, multiplication, division, and exponentiation.
+A browser arithmetic game on a green felt table. Draw eight distinct cards from a standard deck, then combine them into exactly **2025** using addition, subtraction, multiplication, and division. Exponentiation is off by default; check **Allow exponentiation** in Game settings and Apply to enable it.
 
 Expand **Game settings** on the starting screen to choose **2–52 cards** and a **positive integer target**. Apply saves the preference; Standard 2025 restores eight cards and target 2025. Configuration is fixed for each attempt, and winning always requires using every starting card. Targets remain exact strings rather than JavaScript floating-point numbers, up to the existing 4096-bit arithmetic limit.
 
@@ -33,7 +33,7 @@ All cards display just their value. The main menu's **Playing card mode** change
 - **Undo:** restore the previous board; the timer keeps running.
 - **Give up:** confirm to stop the timer and save a give-up result with its duration.
 - **Play again:** deal the next hand after a win or give-up. Leaving active play through the menu also asks you to confirm giving up.
-- **A / S / D / F / G:** choose add / subtract / multiply / divide / power after selecting the first card or both operands. Keys are displayed under the buttons.
+- **A / S / D / F:** choose add / subtract / multiply / divide after selecting the first card or both operands. **G** selects power only when exponentiation is enabled. Keys are displayed under the available buttons.
 - **Escape:** clear the selected card and operation.
 
 Negative and fractional results are allowed. Fractions are exact, backed by BigInt. Powers require an integer exponent between −1024 and 1024, and numerator/denominator size is limited to 4096 bits to keep calculations responsive. Division by zero, zero to a negative power, and `0^0` are rejected without consuming cards. Inspect a selected card to see its full value and expression. The starting screen includes expandable Rules & how to play.
@@ -46,7 +46,7 @@ The server stores anonymous players, session-token hashes, settings, and runs in
 
 The statistics screen includes:
 
-Standard 2025 and Variations are separate sections. Every variation is grouped by its exact card count and target; times, success rates, and history are never mixed across different games. Legacy records belong to standard 2025. Reset all statistics clears every group while keeping preferences.
+Standard 2025 (eight cards, target 2025, exponentiation off) and Variations are separate sections. Every variation is grouped by its card count, exact target and exponentiation setting; times, success rates and history are never mixed across different rules. Historical runs that allowed powers remain in a labeled variation. Reset all statistics clears every group while keeping preferences.
 
 - Wins, best winning time, and average of the latest 20 wins, with the available sample count.
 - Success rate: wins divided by all ended attempts (wins + explicit give-ups + other abandonments). Active attempts are excluded.

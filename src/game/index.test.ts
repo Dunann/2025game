@@ -4,9 +4,10 @@ import { createGame, drawHand, formatExpression, formatValue, hasWon, mergeCards
 
 const fixture: SourceCard[] = [1, 2, 3, 4, 5, 6, 10, 13].map(rank => ({ id: `original-${rank}`, rank, suit: 'spades' }));
 const value = (numerator: bigint, denominator = 1n): GameValue => ({ numerator, denominator });
+const powerConfig = { cardCount: 8, target: '2025', exponentiationEnabled: true };
 
 function calculate(a: GameValue, operation: Operation, b: GameValue) {
-  const state = createGame(fixture);
+  const state = createGame(fixture, powerConfig);
   state.cards[0] = { ...state.cards[0], value: a };
   state.cards[1] = { ...state.cards[1], value: b };
   const result = mergeCards(state, state.cards[0].id, operation, state.cards[1].id);
@@ -110,7 +111,7 @@ describe('state transitions and winning', () => {
   });
 
   it('wins the full eight-card fixture after exactly seven merges', () => {
-    let state: GameState = createGame(fixture);
+    let state: GameState = createGame(fixture, powerConfig);
     const ranks = new Map(state.initialHand.map(card => [card.rank, card.id]));
     function merge(first: string, operation: Operation, second: string) {
       const result = mergeCards(state, first, operation, second);

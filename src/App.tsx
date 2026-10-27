@@ -6,7 +6,7 @@ import { PlayScreen } from './features/play/PlayScreen';
 import { defaultData, finishRun, resetStats, saveData, startRun, updateSettings } from './storage';
 import { bootstrapProfile, saves, subscribeToSaves } from './persistence';
 import type { SaveCommand, SaveStatus } from './storage/sync';
-import { gameConfigKey, getGameConfig } from './config';
+import { gameConfigKey, getGameConfig, getRunConfig } from './config';
 import type { ActiveRun, GameState, Operation, RunOutcome, StoredData } from './types';
 
 interface Session {
@@ -144,7 +144,7 @@ export default function App() {
     <main id="main-content" className={`page page-${page}`} inert={confirmation ? true : undefined}>
       {!ready && <section className="connection-screen" aria-live="polite"><h1 tabIndex={-1}>{loadError ? 'Unable to connect' : 'Loading…'}</h1><p>{loadError ?? 'Connecting to your records.'}</p>{loadError && <button className="button button-primary" onClick={() => setLoadAttempt(value => value + 1)}>Retry connection</button>}</section>}
       {ready && page === 'menu' && <MainMenu settings={data.settings} onSettingsChange={(settings) => persist(updateSettings(dataRef.current, settings), { kind: 'settings', settings })}
-        onPlay={() => begin()} onStats={() => setPage('stats')} wins={data.runs.filter((run) => run.outcome === 'won' && gameConfigKey(getGameConfig(run.config)) === gameConfigKey(getGameConfig(data.settings.gameConfig))).length} />}
+        onPlay={() => begin()} onStats={() => setPage('stats')} wins={data.runs.filter((run) => run.outcome === 'won' && gameConfigKey(getRunConfig(run.config)) === gameConfigKey(getGameConfig(data.settings.gameConfig))).length} />}
       {ready && page === 'stats' && <StatsScreen data={data} onMenu={() => setPage('menu')}
         onReset={() => confirmAction('Clear your records?', 'Run history and statistics for every game variation will be erased. Your settings will be kept.', 'Clear records', () => persist(resetStats(dataRef.current), { kind: 'reset' }))} />}
       {ready && page === 'play' && session && <PlayScreen game={session.game} playingCardMode={data.settings.playingCardMode} elapsedMs={elapsedMs}

@@ -11,12 +11,14 @@ export function MainMenu({ settings, onSettingsChange, onPlay, onStats, wins }: 
   const savedConfig = getGameConfig(settings.gameConfig);
   const [cardCount, setCardCount] = useState(String(savedConfig.cardCount));
   const [target, setTarget] = useState(savedConfig.target);
+  const [exponentiationEnabled, setExponentiationEnabled] = useState(savedConfig.exponentiationEnabled);
   const [errors, setErrors] = useState<{ cardCountError: string | null; targetError: string | null }>({ cardCountError: null, targetError: null });
   useEffect(() => {
     setCardCount(String(savedConfig.cardCount));
     setTarget(savedConfig.target);
+    setExponentiationEnabled(savedConfig.exponentiationEnabled);
     setErrors({ cardCountError: null, targetError: null });
-  }, [savedConfig.cardCount, savedConfig.target]);
+  }, [savedConfig.cardCount, savedConfig.target, savedConfig.exponentiationEnabled]);
 
   return <section className="main-menu" aria-label="Main menu">
     <div className="menu-seal" aria-hidden="true">♠</div>
@@ -30,7 +32,7 @@ export function MainMenu({ settings, onSettingsChange, onPlay, onStats, wins }: 
       <summary className="button button-quiet">Game settings<span className="menu-rules-toggle" aria-hidden="true">+</span></summary>
       <form className="game-settings-form" noValidate onSubmit={event => {
         event.preventDefault();
-        const result = validateGameSettings(cardCount, target);
+        const result = validateGameSettings(cardCount, target, exponentiationEnabled);
         setErrors(result);
         if (result.config) { setTarget(result.config.target); onSettingsChange({ ...settings, gameConfig: result.config }); }
       }}>
@@ -40,8 +42,9 @@ export function MainMenu({ settings, onSettingsChange, onPlay, onStats, wins }: 
         <label htmlFor="setting-target">Target</label>
         <input id="setting-target" type="text" inputMode="numeric" value={target} onChange={event => setTarget(event.target.value)} aria-invalid={Boolean(errors.targetError)} aria-describedby={errors.targetError ? 'target-error' : undefined} />
         {errors.targetError && <p id="target-error" className="settings-error" role="alert">{errors.targetError}</p>}
+        <label className="settings-checkbox"><input type="checkbox" checked={exponentiationEnabled} onChange={event => setExponentiationEnabled(event.target.checked)} />Allow exponentiation</label>
         <div className="settings-actions"><button type="submit" className="button button-primary">Apply</button><button type="button" className="button button-quiet" onClick={() => {
-          setCardCount(String(DEFAULT_GAME_CONFIG.cardCount)); setTarget(DEFAULT_GAME_CONFIG.target);
+          setCardCount(String(DEFAULT_GAME_CONFIG.cardCount)); setTarget(DEFAULT_GAME_CONFIG.target); setExponentiationEnabled(false);
           setErrors({ cardCountError: null, targetError: null });
           onSettingsChange({ ...settings, gameConfig: { ...DEFAULT_GAME_CONFIG } });
         }}>Standard 2025</button></div>

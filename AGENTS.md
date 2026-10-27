@@ -2,17 +2,15 @@
 
 ## Current authorization
 
-Implementation is authorized. The initial planning documents were pushed in commit `46237e3`, followed by the first draft and subsequent UI/configuration changes. Public deployment is now authorized on **Render Free + Neon Free**. Never add payment details, paid resources or upgrades. The latest optional-exponentiation request below is a planning handoff.
+Implementation is authorized. The initial planning documents were pushed in commit `46237e3`, followed by the first draft and subsequent UI/configuration changes. Public deployment is now authorized on **Render Free + Neon Free**. Never add payment details, paid resources or upgrades. Optional exponentiation implementation is now explicitly authorized.
 
 Read `PLAN.md` before starting work. Treat its proposed defaults as provisional where decisions remain open. User answers override those defaults; update the plan when answers arrive.
 
-## Next change: optional exponentiation (planning only)
+## Current change: optional exponentiation
 
-The user requested completion of the cloud database connection, then a plan and
-agent assignments for making exponentiation opt-in and **off by default**. The
-planning workers have reviewed the current implementation; do not implement this
-change as part of the planning handoff. The detailed sequence is in `PLAN.md`.
-This newer requirement supersedes earlier five-operation defaults once implemented.
+The user authorized implementing exponentiation as an opt-in Game settings
+checkbox, **off by default**. Follow the worker ownership below and the sequence
+in `PLAN.md`. This supersedes the earlier five-operation default.
 
 | Agent | Implementation ownership when execution begins |
 | --- | --- |
@@ -35,11 +33,11 @@ avoid duplicate file ownership, and collect targeted checks before integrating.
 
 Build a browser game with a starting menu, a play screen, and a statistics screen. The standard game uses eight distinct cards and target 2025. Main-menu settings allow 2–52 cards from the standard deck and a positive integer target within the 4096-bit exact-arithmetic bound. Card values are 1–13; repeated ranks are allowed when the physical cards differ.
 
-Support both interaction orders: first card → operation → second card, and first card → second card → operation. Show the first card with a gold border and the second with a blue border; selection order defines subtraction, division, and exponentiation. A/S/D/F/G select add/subtract/multiply/divide/power. Replace the operands with one result card at a random valid position.
+Support both interaction orders: first card → operation → second card, and first card → second card → operation. Show the first card with a gold border and the second with a blue border; selection order defines subtraction, division, and exponentiation. A/S/D/F select add/subtract/multiply/divide; power and G are available only if Allow exponentiation was enabled before the run. Replace the operands with one result card at a random valid position.
 
 Display numeric values by default. A playing card mode displays exact values 1, 11, 12, and 13 as A, J, Q, and K. All other values retain their numeric representation.
 
-Winning requires consuming every starting card into one exact value equal to the run's configured target. Snapshot configuration at run start; standard and variation statistics must be isolated by card count and canonical target. Include all five operation buttons, including exponentiation. Use exact fractions with integer exponents. Initial hands need not be guaranteed solvable; guaranteed solvable deals are a desired future feature.
+Winning requires consuming every starting card into one exact value equal to the run's configured target. Snapshot configuration at run start; standard and variation statistics must be isolated by card count, canonical target and exponentiation flag. Default to four operations; the opt-in checkbox adds exponentiation. Use exact fractions with integer exponents. Initial hands need not be guaranteed solvable; guaranteed solvable deals are a desired future feature.
 
 Include a Give up button that ends the run and records its elapsed time. Statistics include wins, best winning time, average time of the last 20 wins, success rate, and time until give up. Follow `PLAN.md` for proposed outcome and aggregation definitions; distinguish explicit give-ups from other abandoned runs.
 

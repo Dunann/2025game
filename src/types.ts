@@ -1,5 +1,5 @@
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power';
-export interface GameConfig { cardCount: number; target: string }
+export interface GameConfig { cardCount: number; target: string; exponentiationEnabled: boolean }
 export interface GameValue { numerator: bigint; denominator: bigint }
 export interface SourceCard { id: string; rank: number; suit: 'clubs' | 'diamonds' | 'hearts' | 'spades' }
 export type Expression = { kind: 'source'; source: SourceCard } | { kind: 'merge'; operation: Operation; left: Expression; right: Expression };

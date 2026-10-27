@@ -1,7 +1,9 @@
-import type { ActiveRun, RunRecord, Settings, StoredData } from '../types';
+import type { ActiveRun, GameConfig, RunRecord, Settings, StoredData } from '../types';
 import { parseStoredData } from './index';
 
 export const REQUEST_TIMEOUT_MS = 10_000;
+/** Older queued settings cannot express the power preference; omission preserves it. */
+export type SettingsWrite = Omit<Settings, 'gameConfig'> & { gameConfig?: Omit<GameConfig, 'exponentiationEnabled'> & { exponentiationEnabled?: boolean } };
 
 export class ApiError extends Error {
   readonly status: number | null;
@@ -49,7 +51,7 @@ export async function loadProfile(): Promise<StoredData> {
   if (!profile) throw new ApiError('The server returned an unsupported profile. Please try again.');
   return profile;
 }
-export function saveRemoteSettings(settings: Settings): Promise<void> { return mutate('/api/settings', 'PUT', settings); }
+export function saveRemoteSettings(settings: SettingsWrite): Promise<void> { return mutate('/api/settings', 'PUT', settings); }
 export function startRemoteRun(run: ActiveRun): Promise<void> { return mutate('/api/runs/start', 'POST', run); }
 export function finishRemoteRun(record: RunRecord): Promise<void> { return mutate('/api/runs/finish', 'POST', record); }
 export function resetRemoteStats(): Promise<void> { return mutate('/api/stats', 'DELETE'); }

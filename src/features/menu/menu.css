@@ -49,6 +49,8 @@
 .game-settings-form input[aria-invalid="true"] { border-color: #f5b99a; }
 .game-settings-form .settings-error { margin: 0 0 6px; font-size: 14px; line-height: 1.5; color: #ffd1b6; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.game-settings-form .settings-checkbox { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }
+.game-settings-form .settings-checkbox input { width: 26px; min-height: 26px; height: 26px; margin: 0; flex: 0 0 auto; accent-color: var(--gold); cursor: pointer; }
 @media (max-width: 480px) {
   .main-menu { padding: 28px 8px 34px; }
   .main-menu .eyebrow { letter-spacing: .1em; }

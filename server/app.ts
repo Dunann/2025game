@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express';
 import type { ActiveRun, GameConfig, RunRecord, Settings, StoredData } from '../src/types';
-import { gameConfigKey, getGameConfig, parseGameConfig } from '../src/config';
+import { gameConfigKey, getGameConfig, parseGameConfig, parseRunConfig } from '../src/config';
 import type { Database, Transaction } from './database';
 
 interface RateLimitOptions {
@@ -28,12 +28,14 @@ function parseConfig(raw: unknown): GameConfig {
   return config;
 }
 function rowConfig(row: Record<string, unknown>): GameConfig {
-  return { cardCount: Number(row.card_count), target: row.target as string };
+  return { cardCount: Number(row.card_count), target: row.target as string, exponentiationEnabled: row.exponentiation_enabled === true };
 }
 
 function parseStart(body: unknown): ActiveRun {
   if (!isObject(body) || !validId(body.id) || !validTime(body.startedAt)) throw new HttpError(400, 'A valid run ID and start timestamp are required.');
-  return { id: body.id, startedAt: body.startedAt, config: parseConfig(body.config) };
+  const config = parseRunConfig(body.config);
+  if (!config) throw new HttpError(400, 'A valid game configuration and boolean exponentiation setting are required.');
+  return { id: body.id, startedAt: body.startedAt, config };
 }
 function parseFinish(body: unknown): RunRecord {
   const start = parseStart(body);
@@ -155,8 +157,8 @@ export function createApp(db: Database, options: AppOptions = {}) {
   app.get('/api/profile', async (_req, res) => {
     const profile = await db.transaction(async tx => {
       await lockPlayer(tx, res.locals.playerId);
-      const settings = await tx.query('SELECT playing_card_mode, card_count, target FROM settings WHERE player_id = $1', [res.locals.playerId]);
-      const records = await tx.query('SELECT id, status, started_at, ended_at, elapsed_ms, card_count, target FROM runs WHERE player_id = $1 ORDER BY started_at, id', [res.locals.playerId]);
+      const settings = await tx.query('SELECT playing_card_mode, card_count, target, exponentiation_enabled FROM settings WHERE player_id = $1', [res.locals.playerId]);
+      const records = await tx.query('SELECT id, status, started_at, ended_at, elapsed_ms, card_count, target, exponentiation_enabled FROM runs WHERE player_id = $1 ORDER BY started_at, id', [res.locals.playerId]);
       const runs: RunRecord[] = [];
       let activeRun: ActiveRun | null = null;
       for (const row of records.rows) {
@@ -171,7 +173,7 @@ export function createApp(db: Database, options: AppOptions = {}) {
   app.put('/api/settings', async (req, res) => {
     const settings = parseSettings(req.body);
     if (settings.gameConfig) {
-      await db.query('UPDATE settings SET playing_card_mode = $2, card_count = $3, target = $4 WHERE player_id = $1', [res.locals.playerId, settings.playingCardMode, settings.gameConfig.cardCount, settings.gameConfig.target]);
+      await db.query('UPDATE settings SET playing_card_mode = $2, card_count = $3, target = $4, exponentiation_enabled = COALESCE($5, exponentiation_enabled) WHERE player_id = $1', [res.locals.playerId, settings.playingCardMode, settings.gameConfig.cardCount, settings.gameConfig.target, isObject(req.body.gameConfig) && typeof req.body.gameConfig.exponentiationEnabled === 'boolean' ? req.body.gameConfig.exponentiationEnabled : null]);
     } else {
       // A legacy display-only update must not erase a saved custom game.
       await db.query('UPDATE settings SET playing_card_mode = $2 WHERE player_id = $1', [res.locals.playerId, settings.playingCardMode]);
@@ -183,7 +185,7 @@ export function createApp(db: Database, options: AppOptions = {}) {
     const run = parseStart(req.body);
     await db.transaction(async tx => {
       await lockPlayer(tx, res.locals.playerId);
-      const existing = await tx.query('SELECT status, started_at, card_count, target FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
+      const existing = await tx.query('SELECT status, started_at, card_count, target, exponentiation_enabled FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
       if (existing.rows.length) {
         if (Number(existing.rows[0].started_at) !== run.startedAt) throw new HttpError(409, 'That run ID has a different start timestamp.');
         if (gameConfigKey(rowConfig(existing.rows[0])) !== gameConfigKey(getGameConfig(run.config))) throw new HttpError(409, 'That run ID has a different game configuration.');
@@ -192,7 +194,7 @@ export function createApp(db: Database, options: AppOptions = {}) {
       const active = await tx.query("SELECT id FROM runs WHERE player_id = $1 AND status = 'active'", [res.locals.playerId]);
       if (active.rows.length) throw new HttpError(409, 'Finish the current active run before starting another.');
       const config = getGameConfig(run.config);
-      await tx.query("INSERT INTO runs(player_id, id, status, started_at, card_count, target) VALUES ($1, $2, 'active', $3, $4, $5)", [res.locals.playerId, run.id, run.startedAt, config.cardCount, config.target]);
+      await tx.query("INSERT INTO runs(player_id, id, status, started_at, card_count, target, exponentiation_enabled) VALUES ($1, $2, 'active', $3, $4, $5, $6)", [res.locals.playerId, run.id, run.startedAt, config.cardCount, config.target, config.exponentiationEnabled]);
     });
     res.json({ ok: true });
   });
@@ -201,7 +203,7 @@ export function createApp(db: Database, options: AppOptions = {}) {
     const run = parseFinish(req.body);
     await db.transaction(async tx => {
       await lockPlayer(tx, res.locals.playerId);
-      const existing = await tx.query('SELECT status, started_at, card_count, target FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
+      const existing = await tx.query('SELECT status, started_at, card_count, target, exponentiation_enabled FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
       if (!existing.rows.length) throw new HttpError(409, 'Start the run before recording its result.');
       if (Number(existing.rows[0].started_at) !== run.startedAt) throw new HttpError(409, 'The run start timestamp does not match.');
       if (gameConfigKey(rowConfig(existing.rows[0])) !== gameConfigKey(getGameConfig(run.config))) throw new HttpError(409, 'The run game configuration does not match.');

@@ -29,7 +29,7 @@
 .pending-symbol { color: var(--gold); }
 .first-operand { color: var(--gold); }
 .second-operand { color: #a0e5fa; }
-.operation-buttons { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; max-width: 540px; margin-inline: auto; gap: 12px; }
+.operation-buttons { display: grid; grid-template-columns: repeat(var(--operation-count, 4), minmax(0, 1fr)); width: 100%; max-width: 540px; margin-inline: auto; gap: 12px; }
 .operation-control { display: grid; min-width: 44px; gap: 9px; justify-items: center; }
 .operation-shortcut { color: var(--ivory); font-size: 12px; line-height: 1.5; white-space: nowrap; }
 .operation-shortcut kbd { font: inherit; font-weight: 700; color: var(--gold); }

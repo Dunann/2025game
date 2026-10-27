@@ -7,18 +7,18 @@ function records(count: number, outcome: RunOutcome): RunRecord[] {
 }
 
 describe('statistics', () => {
-  it('separates legacy standard records and exact variation configurations', () => {
+  it('separates legacy power-enabled records from the new standard and exact variations', () => {
     const base = { id: 'legacy', startedAt: 0, endedAt: 10, elapsedMs: 9000, outcome: 'won' as const };
     const grouped = groupStatsRuns([
-      base, { ...base, id: 'explicit', config: { cardCount: 8, target: '02025' } },
-      { ...base, id: 'v1', elapsedMs: 100, config: { cardCount: 4, target: '0024' } },
-      { ...base, id: 'v2', outcome: 'given_up', elapsedMs: 200, config: { cardCount: 4, target: '24' } },
-      { ...base, id: 'v3', elapsedMs: 300, config: { cardCount: 5, target: '24' } },
-      { ...base, id: 'v4', elapsedMs: 400, config: { cardCount: 4, target: '25' } },
-      { ...base, id: 'bad', config: { cardCount: 0, target: '2025' } },
+      base, { ...base, id: 'explicit', config: { cardCount: 8, target: '02025', exponentiationEnabled: false } },
+      { ...base, id: 'v1', elapsedMs: 100, config: { cardCount: 4, target: '0024', exponentiationEnabled: false } },
+      { ...base, id: 'v2', outcome: 'given_up', elapsedMs: 200, config: { cardCount: 4, target: '24', exponentiationEnabled: false } },
+      { ...base, id: 'v3', elapsedMs: 300, config: { cardCount: 5, target: '24', exponentiationEnabled: false } },
+      { ...base, id: 'v4', elapsedMs: 400, config: { cardCount: 4, target: '25', exponentiationEnabled: false } },
+      { ...base, id: 'bad', config: { cardCount: 0, target: '2025', exponentiationEnabled: false } },
     ]);
-    expect(grouped.standard.map(run => run.id)).toEqual(['legacy', 'explicit']);
-    expect(grouped.variations.map(group => [group.config.cardCount, group.config.target, group.runs.map(run => run.id)])).toEqual([[4, '24', ['v1', 'v2']], [4, '25', ['v4']], [5, '24', ['v3']]]);
+    expect(grouped.standard.map(run => run.id)).toEqual(['explicit']);
+    expect(grouped.variations.map(group => [group.config.cardCount, group.config.target, group.runs.map(run => run.id)])).toEqual([[4, '24', ['v1', 'v2']], [4, '25', ['v4']], [5, '24', ['v3']], [8, '2025', ['legacy']]]);
     const stats = aggregateStats(grouped.variations[0].runs);
     expect(stats.bestWin).toBe(100);
     expect(stats.giveUpAverage).toBe(200);

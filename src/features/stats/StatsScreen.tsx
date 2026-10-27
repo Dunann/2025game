@@ -23,7 +23,7 @@ export function StatsScreen({ data, onMenu, onReset }: Props) {
     {tab === 'standard' ? <StatsGroup runs={grouped.standard} config={DEFAULT_GAME_CONFIG} /> : selected ? <>
       <label className="stats-config-select">Game
         <select value={gameConfigKey(selected.config)} onChange={event => setSelectedKey(event.target.value)}>
-          {grouped.variations.map(group => <option key={gameConfigKey(group.config)} value={gameConfigKey(group.config)}>{group.config.cardCount} cards · Target {group.config.target}</option>)}
+          {grouped.variations.map(group => <option key={gameConfigKey(group.config)} value={gameConfigKey(group.config)}>{group.config.cardCount} cards · Target {group.config.target} · Powers {group.config.exponentiationEnabled ? 'on' : 'off'}</option>)}
         </select>
       </label>
       <StatsGroup runs={selected.runs} config={selected.config} />
@@ -36,7 +36,7 @@ function StatsGroup({ runs, config }: { runs: RunRecord[]; config: GameConfig })
   const stats = aggregateStats(runs);
   const history = [...runs].sort((a, b) => b.endedAt - a.endedAt).slice(0, 20);
   return <div className="stats-config-group" aria-live="polite">
-    <h2 className="stats-config-title">{config.cardCount} cards · Target <span>{config.target}</span></h2>
+    <h2 className="stats-config-title">{config.cardCount} cards · Target <span>{config.target}</span> · Powers {config.exponentiationEnabled ? 'on' : 'off'}</h2>
     <div className="stats-grid">
       <Stat label="Wins" value={String(stats.won)} detail={`${stats.ended} ended attempts`} />
       <Stat label="Best winning time" value={formatDuration(stats.bestWin)} detail={stats.won ? 'Fastest win' : 'No wins yet'} />
