@@ -6,6 +6,9 @@
   font-display: swap;
 }
 
+.menu-credit { margin: 44px 0 0; font-size: 13px; line-height: 1.7; }
+.menu-credit a { color: #b7c8bb; text-decoration: none; }
+.menu-credit a:hover { color: var(--ivory); }
 .main-menu { width: min(100%, 720px); margin: auto; padding: 44px 24px 40px; text-align: center; color: var(--ivory); }
 .main-menu .eyebrow { font-size: clamp(15px, 2.3vw, 18px); letter-spacing: .16em; line-height: 1.7; }
 .menu-seal { color: var(--gold); font-size: 48px; margin-bottom: 20px; text-shadow: 0 4px 12px #0004; }
@@ -37,6 +40,15 @@
 .card-mode-setting small { display: block; color: var(--muted); font-size: 16px; line-height: 1.6; margin-top: 8px; }
 .card-mode-setting input { width: 28px; height: 28px; margin: 8px; accent-color: var(--gold); flex: 0 0 auto; cursor: pointer; }
 .menu-footnote { color: var(--muted); font-size: 16px; line-height: 1.8; margin-bottom: 0; }
+.menu-current-config { margin: -22px 0 32px; color: var(--gold); line-height: 1.6; overflow-wrap: anywhere; }
+.menu-current-config > span:first-child { padding-inline: 8px; }
+.game-settings { margin-bottom: 22px; }
+.game-settings-form { display: grid; gap: 12px; padding: 26px 18px; text-align: left; }
+.game-settings-form label { font-size: 18px; color: var(--ivory); }
+.game-settings-form input { width: 100%; min-width: 0; min-height: 48px; padding: 10px 14px; border: 1px solid #c9b47988; border-radius: 7px; background: #082d23; color: var(--ivory); font: inherit; }
+.game-settings-form input[aria-invalid="true"] { border-color: #f5b99a; }
+.game-settings-form .settings-error { margin: 0 0 6px; font-size: 14px; line-height: 1.5; color: #ffd1b6; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
 @media (max-width: 480px) {
   .main-menu { padding: 28px 8px 34px; }
   .main-menu .eyebrow { letter-spacing: .1em; }

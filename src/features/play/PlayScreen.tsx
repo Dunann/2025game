@@ -8,6 +8,7 @@ import { OPERATION_CONTROLS, playKeyAction } from './keyboard';
 import { EMPTY_SELECTION, transitionSelection } from './selection';
 import { RulesContent } from '../rules/RulesContent';
 import type { SelectionAction } from './selection';
+import { arrangeCards } from './layout';
 import './play.css';
 
 export interface PlayScreenProps {
@@ -23,32 +24,14 @@ export interface PlayScreenProps {
   onMenu: () => void;
 }
 
-type Position = { slot: number; tilt: number };
-type Burst = { id: number; cardId: string };
 
-function arrange(ids: string[], previous: Record<string, Position>): Record<string, Position> {
-  const next: Record<string, Position> = {};
-  const available = Array.from({ length: 8 }, (_, slot) => slot);
-  for (const id of ids) {
-    if (previous[id]) {
-      next[id] = previous[id];
-      available.splice(available.indexOf(previous[id].slot), 1);
-    }
-  }
-  for (const id of ids) {
-    if (!next[id]) {
-      const index = Math.floor(Math.random() * available.length);
-      next[id] = { slot: available.splice(index, 1)[0], tilt: Math.random() * 6 - 3 };
-    }
-  }
-  return next;
-}
+type Burst = { id: number; cardId: string };
 
 export function PlayScreen(props: PlayScreenProps) {
   const { game, playingCardMode, elapsedMs, outcome, error, onMerge } = props;
   const [selection, setSelection] = useState(EMPTY_SELECTION);
   const { firstId, secondId, operation } = selection;
-  const [positions, setPositions] = useState(() => arrange(game.cards.map(card => card.id), {}));
+  const [positions, setPositions] = useState(() => arrangeCards(game.cards.map(card => card.id), {}, game.initialHand.length));
   const [burst, setBurst] = useState<Burst | null>(null);
   const cardButtons = useRef(new Map<string, HTMLButtonElement>());
   const terminalHeading = useRef<HTMLHeadingElement>(null);
@@ -60,7 +43,7 @@ export function PlayScreen(props: PlayScreenProps) {
 
   useLayoutEffect(() => {
     const ids = game.cards.map(card => card.id);
-    setPositions(current => arrange(ids, current));
+    setPositions(current => arrangeCards(ids, current, game.initialHand.length));
     const before = previous.current;
     if (before.revision !== game.revision || before.ids.join('|') !== ids.join('|')) {
       setSelection(EMPTY_SELECTION);
@@ -74,7 +57,7 @@ export function PlayScreen(props: PlayScreenProps) {
       if (!finished && resultId) cardButtons.current.get(resultId)?.focus({ preventScroll: true });
     }
     previous.current = { revision: game.revision, ids };
-  }, [game.cards, game.revision, finished]);
+  }, [game.cards, game.revision, game.initialHand.length, finished]);
 
   useEffect(() => {
     if (!burst) return;
@@ -115,17 +98,17 @@ export function PlayScreen(props: PlayScreenProps) {
     : secondCard ? 'Choose an operation to combine your cards'
       : operation ? 'Choose your second card' : 'Choose your second card or an operation';
 
-  return <section ref={screen} className="play-screen" aria-label="Play the 2025 game">
-    {!finished && <h1 className="sr-only">Play the 2025 game</h1>}
+  return <section ref={screen} className="play-screen" aria-label="Play the number game">
+    {!finished && <h1 className="sr-only">Play the number game</h1>}
     <header className="play-header">
       <button className="button button-quiet" onClick={props.onMenu} aria-label="Return to main menu">← Menu</button>
-      <div className="play-target"><span className="eyebrow">The target</span><strong>2025</strong></div>
+      <div className="play-target"><span className="eyebrow">The target</span><strong aria-label={`Target ${game.config.target}`}>{game.config.target}</strong>{game.config.target.length > 10 && <details className="target-details"><summary>Full target</summary><p>{game.config.target}</p></details>}</div>
       <div className="play-clock"><span className="eyebrow">Time</span><strong aria-label={`Elapsed time ${formatDuration(elapsedMs)}`}>{formatDuration(elapsedMs)}</strong></div>
     </header>
 
     <section className="play-table" aria-label="Game table">
       <div className="table-caption"><span>{game.cards.length} {game.cards.length === 1 ? 'card' : 'cards'} remaining</span></div>
-      <div className="card-board" aria-label="Cards">
+      <div className="card-board" aria-label="Cards" style={{ '--board-rows': Math.ceil(Math.max(8, game.initialHand.length) / 4) } as CSSProperties}>
         {game.cards.map(card => {
           const position = positions[card.id];
           const value = formatValue(card.value, playingCardMode);
@@ -138,7 +121,7 @@ export function PlayScreen(props: PlayScreenProps) {
           return <div className={`card-slot${arrival ? ' card-arrival' : ''}`} key={card.id} style={style}>
             <button type="button" className={`number-card${firstSelected ? ' is-selected' : ''}${secondSelected ? ' is-second-selected' : ''}`}
               ref={element => { if (element) cardButtons.current.set(card.id, element); else cardButtons.current.delete(card.id); }}
-              aria-pressed={selected} aria-label={`Card ${exact}${firstSelected ? ', first operand selected' : secondSelected ? ', second operand selected' : ''}. Uses ${card.sourceIds.length} of 8 original cards.`}
+              aria-pressed={selected} aria-label={`Card ${exact}${firstSelected ? ', first operand selected' : secondSelected ? ', second operand selected' : ''}. Uses ${card.sourceIds.length} of ${game.config.cardCount} original cards.`}
               disabled={finished} onClick={() => select({ kind: 'card', id: card.id })}>
               <span>{value}</span>
             </button>
@@ -151,7 +134,7 @@ export function PlayScreen(props: PlayScreenProps) {
     </section>
 
     {finished ? <section className={`run-summary${outcome === 'won' ? ' is-win' : ''}`} aria-live="polite">
-      <h1 ref={terminalHeading} tabIndex={-1}>{outcome === 'won' ? 'You made 2025.' : outcome === 'given_up' ? 'Time to turn the cards.' : 'Until the next hand.'}</h1>
+      <h1 ref={terminalHeading} tabIndex={-1}>{outcome === 'won' ? game.config.target.length <= 24 ? `You made ${game.config.target}.` : 'Target reached.' : outcome === 'given_up' ? 'Time to turn the cards.' : 'Until the next hand.'}</h1>
       <strong className="summary-time">{formatDuration(elapsedMs)}</strong>
       <div className="play-actions"><button className="button button-primary" onClick={props.onPlayAgain}>Play again</button><button className="button button-quiet" onClick={props.onMenu}>Main menu</button></div>
     </section> : <section className="operation-panel" aria-label="Merge controls">
@@ -167,8 +150,8 @@ export function PlayScreen(props: PlayScreenProps) {
         </div>)}
       </div>
       {error && <p className="merge-message is-error" role="alert">{error}</p>}
-      {firstCard && <details className="card-details"><summary>Inspect selected card</summary><p><strong>Exact value:</strong> {formatValue(firstCard.value)}</p><p><strong>Expression:</strong> {formatExpression(firstCard.expression)}</p><p>Uses {firstCard.sourceIds.length} of 8 original cards.</p></details>}
-      <div className="play-actions"><button className="button button-quiet" disabled={!game.history.length} onClick={props.onUndo}>↶ Undo</button><button className="button give-up-button" onClick={props.onGiveUp}>Give up</button><details className="play-help"><summary className="button button-quiet" aria-label="Game rules">?</summary><section className="play-help-panel" aria-label="Game rules"><RulesContent /></section></details></div>
+      {firstCard && <details className="card-details"><summary>Inspect selected card</summary><p><strong>Exact value:</strong> {formatValue(firstCard.value)}</p><p><strong>Expression:</strong> {formatExpression(firstCard.expression)}</p><p>Uses {firstCard.sourceIds.length} of {game.config.cardCount} original cards.</p></details>}
+      <div className="play-actions"><button className="button button-quiet" disabled={!game.history.length} onClick={props.onUndo}>↶ Undo</button><button className="button give-up-button" onClick={props.onGiveUp}>Give up</button><details className="play-help"><summary className="button button-quiet" aria-label="Game rules">?</summary><section className="play-help-panel" aria-label="Game rules"><RulesContent config={game.config} /></section></details></div>
     </section>}
   </section>;
 }

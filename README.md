@@ -2,6 +2,8 @@
 
 A browser arithmetic game on a green felt table. Draw eight distinct cards from a standard deck, then combine them into exactly **2025** using addition, subtraction, multiplication, division, and exponentiation.
 
+Expand **Game settings** on the starting screen to choose **2–52 cards** and a **positive integer target**. Apply saves the preference; Standard 2025 restores eight cards and target 2025. Configuration is fixed for each attempt, and winning always requires using every starting card. Targets remain exact strings rather than JavaScript floating-point numbers, up to the existing 4096-bit arithmetic limit.
+
 ## Run locally
 
 Use Node.js 22.19+ (Node 24 recommended) and npm.
@@ -42,6 +44,8 @@ The server stores anonymous players, session-token hashes, settings, and runs in
 
 The statistics screen includes:
 
+Standard 2025 and Variations are separate sections. Every variation is grouped by its exact card count and target; times, success rates, and history are never mixed across different games. Legacy records belong to standard 2025. Reset all statistics clears every group while keeping preferences.
+
 - Wins, best winning time, and average of the latest 20 wins, with the available sample count.
 - Success rate: wins divided by all ended attempts (wins + explicit give-ups + other abandonments). Active attempts are excluded.
 - Give-up count, average time until giving up, and average of the latest 20 give-ups.
@@ -67,6 +71,8 @@ Separate development commands are `npm run dev:web` and `npm run dev:api`. `npm 
 The database provider remains undecided and no paid resources have been created. For hosted deployment, supply a PostgreSQL `DATABASE_URL`, set `NODE_ENV=production`, build the frontend, and run `npm start`. The production server serves both the API and `dist/`; use HTTPS and configure the listener and trusted proxy for your host. Production fails fast without a PostgreSQL connection instead of using the development database.
 
 Versioned SQL migrations run transactionally at backend startup. The local and hosted database adapters use the same schema and parameterized queries. Hosted PostgreSQL has not been exercised against a real provider yet. See [server/README.md](server/README.md) for environment variables and API details.
+
+Migration 002 adds configuration to settings and runs while preserving existing records with standard-game defaults. Run-start and finish retries must match the same configuration.
 
 Personal practice results are client-reported. Before adding competitive leaderboards or multiplayer, add authenticated accounts and server-authoritative move, outcome, and timing validation.
 

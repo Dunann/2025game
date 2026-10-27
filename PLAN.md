@@ -130,6 +130,44 @@ Keep the green felt and ivory/gold palette, native button semantics, reduced-mot
 - Detailed rules and the in-game ? panel share one rules component. No visible workflow explanation or First/Second legend remains during normal play.
 - The pre-existing local PGlite directory failed to reopen during preview startup. It was preserved without deletion, reset, or repair. Browser checks used temporary component fixtures that do not access player records; full app/database checks are therefore not claimed for this refresh. Database recovery is a separate issue.
 
+## Configurable games — implemented
+
+The user requested that the UI/interaction refresh be committed and pushed first, then this feature be planned and executed with subagents. The refresh is pushed in commit `813a639`.
+
+### Product and data rules
+
+- Keep 8 cards / target 2025 as the standard default. Add a concise main-menu Game settings disclosure for card count and target, with a standard-game reset/preset. Use 2–52 cards, bounded by the single physical deck, and positive whole-number targets. Reject decimals, signs, zero, negative values, scientific notation, and targets beyond the existing 4096-bit exact-arithmetic limit. Canonicalize leading zeros so equivalent targets share statistics.
+- Snapshot configuration when a run starts. It cannot change mid-run. Win only after all source cards have become a single exact value equal to that run's target. Game controls, both merge sequences, keyboard shortcuts, and Give up semantics stay available.
+- Adapt the board to the selected starting-card count: retain shuffled slots, use four responsive columns, and enough rows for up to 52 cards. Allow vertical scrolling rather than overlapping or hiding cards. Use the configured target and card count in accessible labels and on-demand rules; keep ordinary play concise.
+- Save the preferred configuration with settings. Persist each run's own card count and canonical target; never infer historical run settings from current preferences. Legacy records lacking configuration belong to standard 8-card/2025.
+- Statistics get separate standard-game and variations sections. Each variation is grouped by the exact card-count/target pair and has its own wins, times, success rate, give-up statistics, and history. Do not mix different configurations in averages. Keep reset confirmation explicit about clearing all configurations if reset remains global.
+- Add a transactional PostgreSQL schema migration that defaults existing settings/runs to the standard game and stores configuration for active and terminal runs. API validation rejects malformed configuration and prevents changing a run's configuration at finish/retry. Preserve configuration in browser cache, interrupted-run reconciliation, and outbox replay.
+
+### Shared contract and ownership
+
+- Lead owns `src/types.ts`, `src/config.ts`, App lifecycle integration, documentation, overall validation, and commit/push. `GameConfig` is `{cardCount:number,target:string}`. `GameState.config` is required; legacy-compatible `Settings.gameConfig`, `ActiveRun.config`, and `RunRecord.config` are optional at the type boundary and interpreted through `getGameConfig`.
+- Engine/play worker owns `src/game/**` and `src/features/play/**`: configurable deals/wins, scalable board, target presentation, two-order interaction compatibility, targeted checks.
+- Menu/records worker owns `src/features/menu/**`, `src/features/stats/**`, `src/features/rules/**`, `src/storage/**`: settings UI and validation, statistics isolation, dynamic help, cache/outbox compatibility, targeted checks.
+- Backend worker owns `server/**`: migration 002, adapter migration registration, configuration validation/persistence/immutability, legacy defaults, real HTTP/database tests.
+
+### Execution and acceptance
+
+1. Lead establishes configuration types/helpers and this plan, then dispatches the three independent workers against those contracts.
+2. Workers implement their owned areas; lead records the configured run at start and preserves it through finish and interrupted-run handling. Resolve any contract changes before editing shared files.
+3. Verify standard compatibility, 2-card and 52-card deals, custom wins, positive-integer target parsing, invalid values, canonical target keys, settings reload, outbox replay, migration defaults, finish immutability, and separated statistics.
+4. Run the production build and targeted tests, inspect default/custom/max-card layouts where preview infrastructure permits, update documentation and known limits, then commit and push the working result.
+5. Preserve the failed original local database. Use in-memory or separate disposable databases for tests; do not reset player data or claim its recovery without a validated recovery step.
+
+### Implementation results
+
+- Reused three workers for engine/play, menu/records, and backend migration/API work. Lead integrated run snapshots, shared configuration validation, and lifecycle behavior.
+- Implemented 2–52 cards, canonical positive-integer targets, saved menu preferences, dynamic board/target/rules, configuration-isolated statistics, and migration 002 with legacy defaults. Exact targets remain strings throughout storage and API payloads.
+- Production build passed; **162 tests across 13 files passed**, including configuration boundaries, engine wins/provenance, 52-card layout, statistics grouping, cache/outbox preservation, API immutability, and migration of old records.
+- Full-app browser checks used a fresh temporary database and a separate `.localhost` hostname to avoid touching the original database or its browser identity. Verified rejection of a fractional target, canonicalization of 000100 to 100, settings surviving reload, a two-card target-100 run, recorded give-up in its own variation, zero standard attempts despite variation records, 52-card rendering, and menu-exit give-up confirmation.
+- At 320px all 52 cards were present with zero intersecting card bounds and no horizontal page overflow.
+- Removed the decorative screen frame; normal content uses the default cursor, action controls use pointer, and editable fields use text. Added a subtle keyboard-accessible Scott Wu credit linking to the card-game video linked in the Invest Like the Best episode notes (`https://www.youtube.com/watch?v=zxxJNj0H_rs`).
+- The original `.data/postgres` failure is unresolved and its contents were not reset or repaired. Successful database/browser checks used separate disposable databases; the original requires a separate recovery investigation.
+
 - Build an atmospheric poker-table setting: deep forest green felt, subtle CSS texture, a soft central pool of light, dark surrounding rail, and fine warm gold rules. Use CSS for the felt and decoration rather than downloading unnecessary imagery.
 - Use large, readable ivory number cards with rounded corners and restrained shadows. Selected cards get a gold border and visible focus treatment. Numeric value stays the only visible card content; playing card mode changes the rank label rather than adding suit illustrations.
 - Give the main menu a clear typographic hierarchy: small club-style wordmark, prominent 2025 title, short rules, a primary Play action, and secondary Stats access. Carry the same materials and colors through stats, dialogs, and summaries.

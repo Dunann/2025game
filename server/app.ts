@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express';
-import type { ActiveRun, RunRecord, Settings, StoredData } from '../src/types';
+import type { ActiveRun, GameConfig, RunRecord, Settings, StoredData } from '../src/types';
+import { gameConfigKey, getGameConfig, parseGameConfig } from '../src/config';
 import type { Database, Transaction } from './database';
 
 export interface AppOptions { production?: boolean; allowedOrigins?: string[]; staticDir?: string; trustProxy?: boolean }
@@ -13,9 +14,19 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(value);
 const validTime = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8.64e15;
 
+function parseConfig(raw: unknown): GameConfig {
+  if (raw === undefined) return getGameConfig();
+  const config = parseGameConfig(raw);
+  if (!config) throw new HttpError(400, 'Game configuration requires 2–52 cards and a positive whole-number target within 4096 bits.');
+  return config;
+}
+function rowConfig(row: Record<string, unknown>): GameConfig {
+  return { cardCount: Number(row.card_count), target: row.target as string };
+}
+
 function parseStart(body: unknown): ActiveRun {
   if (!isObject(body) || !validId(body.id) || !validTime(body.startedAt)) throw new HttpError(400, 'A valid run ID and start timestamp are required.');
-  return { id: body.id, startedAt: body.startedAt };
+  return { id: body.id, startedAt: body.startedAt, config: parseConfig(body.config) };
 }
 function parseFinish(body: unknown): RunRecord {
   const start = parseStart(body);
@@ -26,7 +37,7 @@ function parseFinish(body: unknown): RunRecord {
 }
 function parseSettings(body: unknown): Settings {
   if (!isObject(body) || typeof body.playingCardMode !== 'boolean') throw new HttpError(400, 'playingCardMode must be a boolean.');
-  return { playingCardMode: body.playingCardMode };
+  return { playingCardMode: body.playingCardMode, ...(body.gameConfig === undefined ? {} : { gameConfig: parseConfig(body.gameConfig) }) };
 }
 
 async function lockPlayer(tx: Transaction, playerId: string) {
@@ -86,22 +97,27 @@ export function createApp(db: Database, options: AppOptions = {}) {
   app.get('/api/profile', async (_req, res) => {
     const profile = await db.transaction(async tx => {
       await lockPlayer(tx, res.locals.playerId);
-      const settings = await tx.query('SELECT playing_card_mode FROM settings WHERE player_id = $1', [res.locals.playerId]);
-      const records = await tx.query('SELECT id, status, started_at, ended_at, elapsed_ms FROM runs WHERE player_id = $1 ORDER BY started_at, id', [res.locals.playerId]);
+      const settings = await tx.query('SELECT playing_card_mode, card_count, target FROM settings WHERE player_id = $1', [res.locals.playerId]);
+      const records = await tx.query('SELECT id, status, started_at, ended_at, elapsed_ms, card_count, target FROM runs WHERE player_id = $1 ORDER BY started_at, id', [res.locals.playerId]);
       const runs: RunRecord[] = [];
       let activeRun: ActiveRun | null = null;
       for (const row of records.rows) {
-        if (row.status === 'active') activeRun = { id: row.id as string, startedAt: Number(row.started_at) };
-        else runs.push({ id: row.id as string, outcome: row.status as RunRecord['outcome'], startedAt: Number(row.started_at), endedAt: Number(row.ended_at), elapsedMs: row.elapsed_ms === null ? null : Number(row.elapsed_ms) });
+        if (row.status === 'active') activeRun = { id: row.id as string, startedAt: Number(row.started_at), config: rowConfig(row) };
+        else runs.push({ id: row.id as string, outcome: row.status as RunRecord['outcome'], startedAt: Number(row.started_at), endedAt: Number(row.ended_at), elapsedMs: row.elapsed_ms === null ? null : Number(row.elapsed_ms), config: rowConfig(row) });
       }
-      return { version: 1, settings: { playingCardMode: settings.rows[0]?.playing_card_mode === true }, runs, startedRuns: records.rows.length, activeRun } satisfies StoredData;
+      return { version: 1, settings: { playingCardMode: settings.rows[0]?.playing_card_mode === true, gameConfig: rowConfig(settings.rows[0]) }, runs, startedRuns: records.rows.length, activeRun } satisfies StoredData;
     });
     res.json(profile);
   });
 
   app.put('/api/settings', async (req, res) => {
     const settings = parseSettings(req.body);
-    await db.query('UPDATE settings SET playing_card_mode = $2 WHERE player_id = $1', [res.locals.playerId, settings.playingCardMode]);
+    if (settings.gameConfig) {
+      await db.query('UPDATE settings SET playing_card_mode = $2, card_count = $3, target = $4 WHERE player_id = $1', [res.locals.playerId, settings.playingCardMode, settings.gameConfig.cardCount, settings.gameConfig.target]);
+    } else {
+      // A legacy display-only update must not erase a saved custom game.
+      await db.query('UPDATE settings SET playing_card_mode = $2 WHERE player_id = $1', [res.locals.playerId, settings.playingCardMode]);
+    }
     res.json({ ok: true });
   });
 
@@ -109,14 +125,16 @@ export function createApp(db: Database, options: AppOptions = {}) {
     const run = parseStart(req.body);
     await db.transaction(async tx => {
       await lockPlayer(tx, res.locals.playerId);
-      const existing = await tx.query('SELECT status, started_at FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
+      const existing = await tx.query('SELECT status, started_at, card_count, target FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
       if (existing.rows.length) {
         if (Number(existing.rows[0].started_at) !== run.startedAt) throw new HttpError(409, 'That run ID has a different start timestamp.');
+        if (gameConfigKey(rowConfig(existing.rows[0])) !== gameConfigKey(getGameConfig(run.config))) throw new HttpError(409, 'That run ID has a different game configuration.');
         return;
       }
       const active = await tx.query("SELECT id FROM runs WHERE player_id = $1 AND status = 'active'", [res.locals.playerId]);
       if (active.rows.length) throw new HttpError(409, 'Finish the current active run before starting another.');
-      await tx.query("INSERT INTO runs(player_id, id, status, started_at) VALUES ($1, $2, 'active', $3)", [res.locals.playerId, run.id, run.startedAt]);
+      const config = getGameConfig(run.config);
+      await tx.query("INSERT INTO runs(player_id, id, status, started_at, card_count, target) VALUES ($1, $2, 'active', $3, $4, $5)", [res.locals.playerId, run.id, run.startedAt, config.cardCount, config.target]);
     });
     res.json({ ok: true });
   });
@@ -125,9 +143,10 @@ export function createApp(db: Database, options: AppOptions = {}) {
     const run = parseFinish(req.body);
     await db.transaction(async tx => {
       await lockPlayer(tx, res.locals.playerId);
-      const existing = await tx.query('SELECT status, started_at FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
+      const existing = await tx.query('SELECT status, started_at, card_count, target FROM runs WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id]);
       if (!existing.rows.length) throw new HttpError(409, 'Start the run before recording its result.');
       if (Number(existing.rows[0].started_at) !== run.startedAt) throw new HttpError(409, 'The run start timestamp does not match.');
+      if (gameConfigKey(rowConfig(existing.rows[0])) !== gameConfigKey(getGameConfig(run.config))) throw new HttpError(409, 'The run game configuration does not match.');
       // A terminal outcome is immutable: retries or competing finishes cannot double-record it.
       if (existing.rows[0].status !== 'active') return;
       await tx.query('UPDATE runs SET status = $3, ended_at = $4, elapsed_ms = $5 WHERE player_id = $1 AND id = $2', [res.locals.playerId, run.id, run.outcome, run.endedAt, run.elapsedMs]);

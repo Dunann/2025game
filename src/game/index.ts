@@ -1,4 +1,5 @@
-import type { ActiveCard, Expression, GameState, GameValue, MergeResult, Operation, SourceCard } from '../types';
+import type { ActiveCard, Expression, GameConfig, GameState, GameValue, MergeResult, Operation, SourceCard } from '../types';
+import { getGameConfig, MAX_CARD_COUNT, MIN_CARD_COUNT, parseGameConfig } from '../config';
 
 const MAX_BITS = 4096;
 const MAX_EXPONENT = 1024n;
@@ -63,26 +64,30 @@ function calculate(a: GameValue, operation: Operation, b: GameValue): GameValue 
   }
 }
 
-export function drawHand(random: () => number = Math.random): SourceCard[] {
+export function drawHand(random: () => number = Math.random, cardCount = getGameConfig().cardCount): SourceCard[] {
+  if (!Number.isInteger(cardCount) || cardCount < MIN_CARD_COUNT || cardCount > MAX_CARD_COUNT) throw new Error('Choose between 2 and 52 cards.');
   const suits: SourceCard['suit'][] = ['clubs', 'diamonds', 'hearts', 'spades'];
   const deck = suits.flatMap(suit => Array.from({ length: 13 }, (_, index) => ({ id: newId(), rank: index + 1, suit })));
-  for (let index = 0; index < 8; index++) {
+  for (let index = 0; index < cardCount; index++) {
     const sample = random();
     if (!Number.isFinite(sample) || sample < 0 || sample >= 1) throw new Error('Random values must be in [0, 1).');
     const swap = index + Math.floor(sample * (deck.length - index));
     [deck[index], deck[swap]] = [deck[swap], deck[index]];
   }
-  return deck.slice(0, 8);
+  return deck.slice(0, cardCount);
 }
 
-export function createGame(hand: SourceCard[] = drawHand()): GameState {
+export function createGame(hand?: SourceCard[], config?: GameConfig): GameState {
+  const normalized = config === undefined ? getGameConfig() : parseGameConfig(config);
+  if (!normalized) throw new Error('Choose a valid card count and positive whole-number target.');
+  hand ??= drawHand(undefined, normalized.cardCount);
   const suits = new Set(['clubs', 'diamonds', 'hearts', 'spades']);
-  if (hand.length !== 8 || hand.some(card => !Number.isInteger(card.rank) || card.rank < 1 || card.rank > 13 || !suits.has(card.suit)) || new Set(hand.map(card => `${card.suit}:${card.rank}`)).size !== 8) {
-    throw new Error('A hand must contain eight distinct cards from a standard deck.');
+  if (hand.length !== normalized.cardCount || hand.some(card => !Number.isInteger(card.rank) || card.rank < 1 || card.rank > 13 || !suits.has(card.suit)) || new Set(hand.map(card => `${card.suit}:${card.rank}`)).size !== normalized.cardCount) {
+    throw new Error(`A hand must contain ${normalized.cardCount} distinct cards from a standard deck.`);
   }
   const initialHand = hand.map(card => ({ ...card, id: newId() }));
   const cards: ActiveCard[] = initialHand.map(source => ({ id: source.id, value: rational(BigInt(source.rank)), sourceIds: [source.id], expression: { kind: 'source', source } }));
-  return { cards, initialHand, history: [], revision: 0 };
+  return { cards, initialHand, history: [], revision: 0, config: { ...normalized } };
 }
 
 export function mergeCards(state: GameState, firstId: string, operation: Operation, secondId: string): MergeResult {
@@ -106,10 +111,11 @@ export function undoMerge(state: GameState): GameState {
 }
 
 export function hasWon(state: GameState): boolean {
-  if (state.cards.length !== 1 || state.initialHand.length !== 8) return false;
+  const config = parseGameConfig(state.config);
+  if (!config || state.cards.length !== 1 || state.initialHand.length !== config.cardCount) return false;
   const card = state.cards[0];
   const originals = new Set(state.initialHand.map(source => source.id));
-  return card.value.numerator === 2025n && card.value.denominator === 1n && originals.size === 8 && card.sourceIds.length === 8 && new Set(card.sourceIds).size === 8 && card.sourceIds.every(id => originals.has(id));
+  return card.value.numerator === BigInt(config.target) && card.value.denominator === 1n && originals.size === config.cardCount && card.sourceIds.length === config.cardCount && new Set(card.sourceIds).size === config.cardCount && card.sourceIds.every(id => originals.has(id));
 }
 
 export function formatValue(value: GameValue, playingCardMode = false): string {

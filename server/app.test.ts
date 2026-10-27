@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Server } from 'node:http';
 import { once } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { PGlite } from '@electric-sql/pglite';
 import type { StoredData } from '../src/types';
 import { createApp } from './app';
 import { createDatabase, type Database } from './database';
+
+const standardConfig = { cardCount: 8, target: '2025' };
 
 describe('database-backed HTTP API', () => {
   let db: Database;
@@ -56,7 +59,7 @@ describe('database-backed HTTP API', () => {
     expect(token).toMatch(/^[a-f0-9]{64}$/);
     const sessions = await db.query('SELECT token_hash FROM sessions');
     expect(sessions.rows.every(row => row.token_hash !== token)).toBe(true);
-    expect(await response.json()).toEqual({ version: 1, settings: { playingCardMode: false }, runs: [], startedRuns: 0, activeRun: null });
+    expect(await response.json()).toEqual({ version: 1, settings: { playingCardMode: false, gameConfig: standardConfig }, runs: [], startedRuns: 0, activeRun: null });
     expect((await request('/api/profile')).headers.get('set-cookie')).toBeNull();
   });
 
@@ -71,10 +74,10 @@ describe('database-backed HTTP API', () => {
     const b = await (await bob('/api/profile')).json() as StoredData;
     expect(a.settings.playingCardMode).toBe(true);
     expect(b.settings.playingCardMode).toBe(false);
-    expect(a.runs).toEqual([finish]);
+    expect(a.runs).toEqual([{ ...finish, config: standardConfig }]);
     expect(a.activeRun).toBeNull();
     expect(b.runs).toEqual([]);
-    expect(b.activeRun).toEqual(run);
+    expect(b.activeRun).toEqual({ ...run, config: standardConfig });
   });
 
   it('starts once, rejects another active attempt, and freezes the first terminal result', async () => {
@@ -104,7 +107,7 @@ describe('database-backed HTTP API', () => {
     expect((await request('/api/runs/finish', 'POST', { ...finish, outcome: 'abandoned', elapsedMs: null })).status).toBe(200);
     expect((await request('/api/stats', 'DELETE')).status).toBe(200);
     const profile = await (await request('/api/profile')).json() as StoredData;
-    expect(profile).toEqual({ version: 1, settings: { playingCardMode: true }, runs: [], startedRuns: 0, activeRun: null });
+    expect(profile).toEqual({ version: 1, settings: { playingCardMode: true, gameConfig: standardConfig }, runs: [], startedRuns: 0, activeRun: null });
   });
 
   it('rejects unstarted finishes, mismatched timestamps, and invalid values', async () => {
@@ -132,6 +135,67 @@ describe('database-backed HTTP API', () => {
     expect(malformed.status).toBe(400);
     expect((await request('/api/unknown')).status).toBe(404);
   });
+
+  it('persists canonical custom settings, preserves them on legacy display updates, and isolates players', async () => {
+    const alice = client(), bob = client();
+    await alice('/api/profile'); await bob('/api/profile');
+    const gameConfig = { cardCount: 52, target: '9007199254740993123456789' };
+    expect((await alice('/api/settings', 'PUT', { playingCardMode: true, gameConfig: { ...gameConfig, target: `000${gameConfig.target}` } })).status).toBe(200);
+    expect((await (await alice('/api/profile')).json() as StoredData).settings).toEqual({ playingCardMode: true, gameConfig });
+    await alice('/api/settings', 'PUT', { playingCardMode: false });
+    expect((await (await alice('/api/profile')).json() as StoredData).settings).toEqual({ playingCardMode: false, gameConfig });
+    expect((await (await bob('/api/profile')).json() as StoredData).settings.gameConfig).toEqual(standardConfig);
+    await alice('/api/stats', 'DELETE');
+    expect((await (await alice('/api/profile')).json() as StoredData).settings.gameConfig).toEqual(gameConfig);
+  });
+
+  it('snapshots custom run configuration and rejects changes at start retry or finish', async () => {
+    const request = client(); await request('/api/profile');
+    const config = { cardCount: 2, target: '42' };
+    const customRun = { ...run, config };
+    await request('/api/settings', 'PUT', { playingCardMode: false, gameConfig: config });
+    expect((await request('/api/runs/start', 'POST', customRun)).status).toBe(200);
+    expect((await request('/api/runs/start', 'POST', { ...customRun, config: { ...config, target: '00042' } })).status).toBe(200);
+    expect((await request('/api/runs/start', 'POST', run)).status).toBe(409);
+    expect((await request('/api/runs/start', 'POST', { ...customRun, config: { ...config, cardCount: 3 } })).status).toBe(409);
+    await request('/api/settings', 'PUT', { playingCardMode: true, gameConfig: { cardCount: 13, target: '99' } });
+    expect((await (await request('/api/profile')).json() as StoredData).activeRun).toEqual(customRun);
+    expect((await request('/api/runs/finish', 'POST', finish)).status).toBe(409);
+    expect((await request('/api/runs/finish', 'POST', { ...finish, config: { ...config, target: '43' } })).status).toBe(409);
+    const customFinish = { ...finish, config };
+    expect((await request('/api/runs/finish', 'POST', customFinish)).status).toBe(200);
+    expect((await request('/api/runs/finish', 'POST', customFinish)).status).toBe(200);
+    expect((await request('/api/runs/finish', 'POST', finish)).status).toBe(409);
+    const profile = await (await request('/api/profile')).json() as StoredData;
+    expect(profile.runs).toEqual([customFinish]);
+    expect(profile.settings.gameConfig).toEqual({ cardCount: 13, target: '99' });
+  });
+
+  it('assigns the standard configuration to legacy runs despite custom preferences', async () => {
+    const request = client(); await request('/api/profile');
+    await request('/api/settings', 'PUT', { playingCardMode: true, gameConfig: { cardCount: 2, target: '24' } });
+    expect((await request('/api/runs/start', 'POST', run)).status).toBe(200);
+    expect((await (await request('/api/profile')).json() as StoredData).activeRun?.config).toEqual(standardConfig);
+    expect((await request('/api/runs/finish', 'POST', finish)).status).toBe(200);
+    expect((await (await request('/api/profile')).json() as StoredData).runs[0].config).toEqual(standardConfig);
+  });
+
+  it('rejects malformed game configurations at every write boundary', async () => {
+    const request = client(); await request('/api/profile');
+    await request('/api/runs/start', 'POST', run);
+    const invalidConfigs: unknown[] = [null, {}, [], { cardCount: 1, target: '24' }, { cardCount: 53, target: '24' }, { cardCount: 2.5, target: '24' }, { cardCount: '8', target: '24' },
+      ...['0', '-1', '+1', '1.5', '1e3', '', '0'.repeat(1235), (1n << 4096n).toString()].map(target => ({ cardCount: 8, target })),
+      { cardCount: 8, target: 2025 },
+    ];
+    for (const config of invalidConfigs) {
+      expect((await request('/api/settings', 'PUT', { playingCardMode: false, gameConfig: config })).status).toBe(400);
+      expect((await request('/api/runs/start', 'POST', { ...run, config })).status).toBe(400);
+      expect((await request('/api/runs/finish', 'POST', { ...finish, config })).status).toBe(400);
+    }
+    const maximumTarget = ((1n << 4096n) - 1n).toString();
+    expect((await request('/api/settings', 'PUT', { playingCardMode: false, gameConfig: { cardCount: 52, target: maximumTarget } })).status).toBe(200);
+    expect((await (await request('/api/profile')).json() as StoredData).settings.gameConfig?.target).toBe(maximumTarget);
+  });
 });
 
 it('persists PostgreSQL data on disk and reopens without reapplying migrations', async () => {
@@ -144,8 +208,42 @@ it('persists PostgreSQL data on disk and reopens without reapplying migrations',
     await db.close(); db = undefined;
     db = await createDatabase({ dataDir });
     expect((await db.query('SELECT id FROM players')).rows).toEqual([{ id: 'persistent-player' }]);
-    expect((await db.query('SELECT version FROM schema_migrations')).rows).toEqual([{ version: 1 }]);
+    expect((await db.query('SELECT version FROM schema_migrations ORDER BY version')).rows).toEqual([{ version: 1 }, { version: 2 }]);
   } finally {
+    if (db) await db.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+}, 30000);
+
+it('migrates existing settings, active and terminal runs to standard configuration without losing data', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), '2025-legacy-db-test-'));
+  let legacy: PGlite | undefined;
+  let db: Database | undefined;
+  try {
+    legacy = new PGlite(directory);
+    await legacy.waitReady;
+    await legacy.exec(await readFile(new URL('./migrations/001_initial.sql', import.meta.url), 'utf8'));
+    await legacy.exec('CREATE TABLE schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now()); INSERT INTO schema_migrations(version) VALUES (1);');
+    await legacy.query('INSERT INTO players(id, created_at) VALUES ($1, $2)', ['legacy-player', 10]);
+    await legacy.query('INSERT INTO settings(player_id, playing_card_mode) VALUES ($1, true)', ['legacy-player']);
+    await legacy.query("INSERT INTO runs(player_id,id,status,started_at) VALUES ($1,'legacy-active','active',100)", ['legacy-player']);
+    await legacy.query("INSERT INTO runs(player_id,id,status,started_at,ended_at,elapsed_ms) VALUES ($1,'legacy-win','won',10,20,10)", ['legacy-player']);
+    await legacy.close(); legacy = undefined;
+    db = await createDatabase({ dataDir: directory });
+    expect((await db.query('SELECT playing_card_mode,card_count,target FROM settings')).rows).toEqual([{ playing_card_mode: true, card_count: 8, target: '2025' }]);
+    expect((await db.query('SELECT id,status,card_count,target FROM runs ORDER BY id')).rows).toEqual([
+      { id: 'legacy-active', status: 'active', card_count: 8, target: '2025' },
+      { id: 'legacy-win', status: 'won', card_count: 8, target: '2025' },
+    ]);
+    expect((await db.query('SELECT version FROM schema_migrations ORDER BY version')).rows).toEqual([{ version: 1 }, { version: 2 }]);
+    // Constraints protect both tables even if a future writer bypasses HTTP validation.
+    await expect(db.query("UPDATE settings SET card_count = 1")).rejects.toThrow();
+    await expect(db.query("UPDATE settings SET target = '00042'")).rejects.toThrow();
+    await expect(db.query("UPDATE runs SET target = '-1'")).rejects.toThrow();
+    await expect(db.query("UPDATE runs SET target = $1", ['1'.repeat(1235)])).rejects.toThrow();
+    expect((await db.query('SELECT elapsed_ms FROM runs WHERE id = $1', ['legacy-win'])).rows).toEqual([{ elapsed_ms: 10 }]);
+  } finally {
+    if (legacy) await legacy.close();
     if (db) await db.close();
     await rm(directory, { recursive: true, force: true });
   }

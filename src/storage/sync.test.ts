@@ -59,6 +59,50 @@ describe('ordered save outbox', () => {
     expect(saveRemoteSettings).toHaveBeenCalledWith({ playingCardMode: true });
     expect(resetRemoteStats).toHaveBeenCalledTimes(1);
   });
+  it('restores and canonicalizes settings and run configurations without losing legacy saves', async () => {
+    const config = { cardCount: 52, target: '009007199254740993' };
+    const canonical = { cardCount: 52, target: '9007199254740993' };
+    const run = { id: 'variation', startedAt: 1, config };
+    const record = { ...run, outcome: 'won', endedAt: 10, elapsedMs: 9 };
+    stored.set(OUTBOX_KEY, JSON.stringify({ version: 1, commands: [
+      { kind: 'settings', settings: { playingCardMode: true, gameConfig: config } },
+      { kind: 'start', run }, { kind: 'finish', record },
+      { kind: 'start', run: { id: 'legacy', startedAt: 2 } },
+    ] }));
+    expect(await createSaveQueue(vi.fn()).flush()).toBe(true);
+    expect(saveRemoteSettings).toHaveBeenCalledWith({ playingCardMode: true, gameConfig: canonical });
+    expect(startRemoteRun).toHaveBeenNthCalledWith(1, { ...run, config: canonical });
+    expect(startRemoteRun).toHaveBeenNthCalledWith(2, { id: 'legacy', startedAt: 2 });
+    expect(finishRemoteRun).toHaveBeenCalledWith({ ...record, config: canonical });
+  });
+  it('snapshots nested configuration before callers can mutate an unsent command', async () => {
+    vi.mocked(startRemoteRun).mockRejectedValue(new Error('Offline'));
+    const queue = createSaveQueue(vi.fn());
+    const config = { cardCount: 4, target: '24' };
+    queue.enqueue({ kind: 'start', run: { id: 'r', startedAt: 1, config } });
+    expect(await queue.flush()).toBe(false);
+    queue.enqueue({ kind: 'settings', settings: { playingCardMode: true, gameConfig: config } });
+    queue.enqueue({ kind: 'finish', record: { id: 'r', startedAt: 1, endedAt: 2, elapsedMs: 1, outcome: 'won', config } });
+    config.cardCount = 8; config.target = '2025';
+    const commands = JSON.parse(stored.get(OUTBOX_KEY)!).commands;
+    expect(commands[0].run.config).toEqual({ cardCount: 4, target: '24' });
+    expect(commands[1].settings.gameConfig).toEqual({ cardCount: 4, target: '24' });
+    expect(commands[2].record.config).toEqual({ cardCount: 4, target: '24' });
+  });
+  it('drops malformed explicit configuration rather than replaying it as a standard attempt', async () => {
+    const config = { cardCount: 8, target: '1e3' };
+    stored.set(OUTBOX_KEY, JSON.stringify({ version: 1, commands: [
+      { kind: 'settings', settings: { playingCardMode: true, gameConfig: config } },
+      { kind: 'start', run: { id: 'bad', startedAt: 1, config } },
+      { kind: 'finish', record: { id: 'bad', startedAt: 1, endedAt: 2, elapsedMs: 1, outcome: 'won', config } },
+      { kind: 'reset' },
+    ] }));
+    expect(await createSaveQueue(vi.fn()).flush()).toBe(true);
+    expect(saveRemoteSettings).not.toHaveBeenCalled();
+    expect(startRemoteRun).not.toHaveBeenCalled();
+    expect(finishRemoteRun).not.toHaveBeenCalled();
+    expect(resetRemoteStats).toHaveBeenCalledOnce();
+  });
 
   it('rejects corrupt recovered payloads while keeping valid commands', async () => {
     stored.set(OUTBOX_KEY, JSON.stringify({ version: 1, commands: [null, { kind: 'settings', settings: { playingCardMode: 'yes' } }, { kind: 'finish', record: { id: 'bad' } }, { kind: 'start', run: { id: 'negative', startedAt: -1 } }, { kind: 'reset' }] }));

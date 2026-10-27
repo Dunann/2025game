@@ -1,4 +1,5 @@
 import type { ActiveRun, RunRecord, Settings } from '../types';
+import { parseGameConfig } from '../config';
 import { finishRemoteRun, resetRemoteStats, saveRemoteSettings, startRemoteRun } from './api';
 
 export type SaveCommand = { kind: 'settings'; settings: Settings } | { kind: 'start'; run: ActiveRun } | { kind: 'finish'; record: RunRecord } | { kind: 'reset' };
@@ -12,15 +13,25 @@ const id = (value: unknown): value is string => typeof value === 'string' && /^[
 function parseCommand(raw: unknown): SaveCommand | null {
   if (!object(raw)) return null;
   if (raw.kind === 'reset') return { kind: 'reset' };
-  if (raw.kind === 'settings' && object(raw.settings) && typeof raw.settings.playingCardMode === 'boolean') return { kind: 'settings', settings: { playingCardMode: raw.settings.playingCardMode } };
-  if (raw.kind === 'start' && object(raw.run) && id(raw.run.id) && time(raw.run.startedAt)) return { kind: 'start', run: { id: raw.run.id, startedAt: raw.run.startedAt } };
+  if (raw.kind === 'settings' && object(raw.settings) && typeof raw.settings.playingCardMode === 'boolean') {
+    const config = 'gameConfig' in raw.settings ? parseGameConfig(raw.settings.gameConfig) : undefined;
+    if (config === null) return null;
+    return { kind: 'settings', settings: { playingCardMode: raw.settings.playingCardMode, ...(config ? { gameConfig: config } : {}) } };
+  }
+  if (raw.kind === 'start' && object(raw.run) && id(raw.run.id) && time(raw.run.startedAt)) {
+    const config = 'config' in raw.run ? parseGameConfig(raw.run.config) : undefined;
+    if (config === null) return null;
+    return { kind: 'start', run: { id: raw.run.id, startedAt: raw.run.startedAt, ...(config ? { config } : {}) } };
+  }
   if (raw.kind === 'finish' && object(raw.record)) {
     const run = raw.record;
     if (!id(run.id) || !time(run.startedAt) || !time(run.endedAt) || run.endedAt < run.startedAt) return null;
     if (run.outcome !== 'won' && run.outcome !== 'given_up' && run.outcome !== 'abandoned') return null;
     if (!time(run.elapsedMs) && !(run.outcome === 'abandoned' && run.elapsedMs === null)) return null;
     if (typeof run.elapsedMs === 'number' && run.elapsedMs > 365 * 24 * 60 * 60 * 1000) return null;
-    return { kind: 'finish', record: { id: run.id, startedAt: run.startedAt, endedAt: run.endedAt, outcome: run.outcome, elapsedMs: run.elapsedMs as number | null } };
+    const config = 'config' in run ? parseGameConfig(run.config) : undefined;
+    if (config === null) return null;
+    return { kind: 'finish', record: { id: run.id, startedAt: run.startedAt, endedAt: run.endedAt, outcome: run.outcome, elapsedMs: run.elapsedMs as number | null, ...(config ? { config } : {}) } };
   }
   return null;
 }

@@ -6,6 +6,7 @@ import { PlayScreen } from './features/play/PlayScreen';
 import { defaultData, finishRun, resetStats, saveData, startRun, updateSettings } from './storage';
 import { bootstrapProfile, saves, subscribeToSaves } from './persistence';
 import type { SaveCommand, SaveStatus } from './storage/sync';
+import { gameConfigKey, getGameConfig } from './config';
 import type { ActiveRun, GameState, Operation, RunOutcome, StoredData } from './types';
 
 interface Session {
@@ -109,8 +110,9 @@ export default function App() {
   }
   function begin() {
     if (!ready) return;
-    const game = createGame();
-    const run = { id: crypto.randomUUID(), startedAt: Date.now() };
+    const config = getGameConfig(dataRef.current.settings.gameConfig);
+    const game = createGame(undefined, config);
+    const run = { id: crypto.randomUUID(), startedAt: Date.now(), config };
     const next = { game, run, clockStart: performance.now(), outcome: null, finalElapsedMs: null };
     persist(startRun(dataRef.current, run), { kind: 'start', run });
     setSession(next);
@@ -142,9 +144,9 @@ export default function App() {
     <main id="main-content" className={`page page-${page}`} inert={confirmation ? true : undefined}>
       {!ready && <section className="connection-screen" aria-live="polite"><h1 tabIndex={-1}>{loadError ? 'Unable to connect' : 'Loading…'}</h1><p>{loadError ?? 'Connecting to your records.'}</p>{loadError && <button className="button button-primary" onClick={() => setLoadAttempt(value => value + 1)}>Retry connection</button>}</section>}
       {ready && page === 'menu' && <MainMenu settings={data.settings} onSettingsChange={(settings) => persist(updateSettings(dataRef.current, settings), { kind: 'settings', settings })}
-        onPlay={() => begin()} onStats={() => setPage('stats')} wins={data.runs.filter((run) => run.outcome === 'won').length} />}
+        onPlay={() => begin()} onStats={() => setPage('stats')} wins={data.runs.filter((run) => run.outcome === 'won' && gameConfigKey(getGameConfig(run.config)) === gameConfigKey(getGameConfig(data.settings.gameConfig))).length} />}
       {ready && page === 'stats' && <StatsScreen data={data} onMenu={() => setPage('menu')}
-        onReset={() => confirmAction('Clear your records?', 'All run history and statistics for this player will be erased from the database. Your display setting will be kept.', 'Clear records', () => persist(resetStats(dataRef.current), { kind: 'reset' }))} />}
+        onReset={() => confirmAction('Clear your records?', 'Run history and statistics for every game variation will be erased. Your settings will be kept.', 'Clear records', () => persist(resetStats(dataRef.current), { kind: 'reset' }))} />}
       {ready && page === 'play' && session && <PlayScreen game={session.game} playingCardMode={data.settings.playingCardMode} elapsedMs={elapsedMs}
         outcome={session.outcome} error={error} onMerge={merge}
         onUndo={() => {

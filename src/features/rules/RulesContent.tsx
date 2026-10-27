@@ -1,9 +1,12 @@
 import './rules.css';
+import type { GameConfig } from '../../types';
+import { getGameConfig } from '../../config';
 
-export function RulesContent() {
+export function RulesContent({ config }: { config?: GameConfig }) {
+  const { cardCount, target } = getGameConfig(config);
   return <div className="rules-content">
-    <h2>Make 2025</h2>
-    <p>Combine all eight starting cards into one card worth exactly <strong>2025</strong>. Reaching 2025 with cards left does not win. Physical cards are distinct, but ranks can repeat. Random hands are not guaranteed solvable.</p>
+    <h2>Make <span className="rules-target">{target}</span></h2>
+    <p>Combine all {cardCount} starting cards into one card worth exactly <strong className="rules-target">{target}</strong>. Reaching the target with cards left does not win. Physical cards are distinct, but ranks can repeat. Random hands are not guaranteed solvable.</p>
     <h2>Combining cards</h2>
     <p>Select a card, choose an operation, then another card. You can also select both cards before choosing the operation. The first card has a gold border; the second has a blue border. Order matters: 8 − 3 makes 5, while 3 − 8 makes −5.</p>
     <p>Negative numbers and exact fractions are allowed. Division by zero, 0⁰, and fractional exponents are rejected. Powers require integer exponents; oversized calculations are rejected.</p>
@@ -15,6 +18,6 @@ export function RulesContent() {
       <li><strong>Play again:</strong> deal the next hand after a win or give-up.</li>
     </ul>
     <h2>Records</h2>
-    <p>The timer includes background-tab time. Success rate is wins divided by all ended attempts, including give-ups and interruptions. Winning and give-up times are tracked separately.</p>
+    <p>The timer includes background-tab time. Success rate is wins divided by all ended attempts, including give-ups and interruptions. Winning and give-up times are tracked separately for each card count and target.</p>
   </div>;
 }

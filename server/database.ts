@@ -11,7 +11,10 @@ export interface Database extends Transaction {
   close(): Promise<void>;
 }
 
-const migrations = [{ version: 1, path: new URL('./migrations/001_initial.sql', import.meta.url) }];
+const migrations = [
+  { version: 1, path: new URL('./migrations/001_initial.sql', import.meta.url) },
+  { version: 2, path: new URL('./migrations/002_game_config.sql', import.meta.url) },
+];
 
 async function migrate(db: Database) {
   await db.transaction(async tx => {

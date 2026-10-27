@@ -1,4 +1,20 @@
-import type { RunRecord } from '../../types';
+import type { GameConfig, RunRecord } from '../../types';
+import { gameConfigKey, getGameConfig, isStandardGame, parseGameConfig } from '../../config';
+
+/** Configuration is part of a record's identity for comparisons and history. */
+export function groupStatsRuns(runs: RunRecord[]): { standard: RunRecord[]; variations: { config: GameConfig; runs: RunRecord[] }[] } {
+  const standard: RunRecord[] = [];
+  const variations = new Map<string, { config: GameConfig; runs: RunRecord[] }>();
+  for (const run of runs) {
+    if ('config' in run && !parseGameConfig(run.config)) continue;
+    const config = getGameConfig(run.config);
+    if (isStandardGame(config)) { standard.push(run); continue; }
+    const key = gameConfigKey(config);
+    if (!variations.has(key)) variations.set(key, { config, runs: [] });
+    variations.get(key)!.runs.push(run);
+  }
+  return { standard, variations: [...variations.values()].sort((a, b) => a.config.cardCount - b.config.cardCount || (BigInt(a.config.target) < BigInt(b.config.target) ? -1 : BigInt(a.config.target) > BigInt(b.config.target) ? 1 : 0)) };
+}
 
 function times(runs: RunRecord[], outcome: RunRecord['outcome']): number[] {
   return runs.filter(run => run.outcome === outcome && run.elapsedMs !== null).sort((a, b) => a.endedAt - b.endedAt).map(run => run.elapsedMs!);

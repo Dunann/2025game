@@ -7,3 +7,4 @@
 .rules-content li + li { margin-top: 12px; }
 .rules-content strong { color: var(--ivory); }
 @media (max-width: 480px) { .rules-content p, .rules-content li { font-size: 17px; } }
+.rules-target { overflow-wrap: anywhere; }

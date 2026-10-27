@@ -1,12 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import type { RunRecord, RunOutcome } from '../../types';
-import { aggregateStats } from './aggregate';
+import { aggregateStats, groupStatsRuns } from './aggregate';
 
 function records(count: number, outcome: RunOutcome): RunRecord[] {
   return Array.from({ length: count }, (_, i) => ({ id: `${outcome}-${i}`, outcome, startedAt: 0, endedAt: i + 1, elapsedMs: (i + 1) * 1000 }));
 }
 
 describe('statistics', () => {
+  it('separates legacy standard records and exact variation configurations', () => {
+    const base = { id: 'legacy', startedAt: 0, endedAt: 10, elapsedMs: 9000, outcome: 'won' as const };
+    const grouped = groupStatsRuns([
+      base, { ...base, id: 'explicit', config: { cardCount: 8, target: '02025' } },
+      { ...base, id: 'v1', elapsedMs: 100, config: { cardCount: 4, target: '0024' } },
+      { ...base, id: 'v2', outcome: 'given_up', elapsedMs: 200, config: { cardCount: 4, target: '24' } },
+      { ...base, id: 'v3', elapsedMs: 300, config: { cardCount: 5, target: '24' } },
+      { ...base, id: 'v4', elapsedMs: 400, config: { cardCount: 4, target: '25' } },
+      { ...base, id: 'bad', config: { cardCount: 0, target: '2025' } },
+    ]);
+    expect(grouped.standard.map(run => run.id)).toEqual(['legacy', 'explicit']);
+    expect(grouped.variations.map(group => [group.config.cardCount, group.config.target, group.runs.map(run => run.id)])).toEqual([[4, '24', ['v1', 'v2']], [4, '25', ['v4']], [5, '24', ['v3']]]);
+    const stats = aggregateStats(grouped.variations[0].runs);
+    expect(stats.bestWin).toBe(100);
+    expect(stats.giveUpAverage).toBe(200);
+    expect(stats.successRate).toBe(50);
+    expect(aggregateStats(grouped.standard).bestWin).toBe(9000);
+  });
   for (const count of [0, 1, 19, 20, 21]) {
     it(`calculates winning and give-up averages for ${count} attempts independently`, () => {
       const wins = records(count, 'won');

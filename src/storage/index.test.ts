@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defaultData, finishRun, loadData, reconcileInterruptedRun, resetStats, saveData, startRun, STORAGE_KEY, updateSettings } from './index';
+import { defaultData, finishRun, loadData, parseStoredData, reconcileInterruptedRun, resetStats, saveData, startRun, STORAGE_KEY, updateSettings } from './index';
 import type { RunRecord } from '../types';
 
 describe('local records', () => {
@@ -25,6 +25,26 @@ describe('local records', () => {
     const data = updateSettings(defaultData(), { playingCardMode: true });
     expect(saveData(data)).toBe(true);
     expect(loadData()).toEqual(data);
+  });
+  it('preserves configuration through cache, finish, interruption and reset', () => {
+    const config = { cardCount: 4, target: '0009007199254740993' };
+    const data = startRun(updateSettings(defaultData(), { playingCardMode: true, gameConfig: config }), { id: 'variation', startedAt: 1, config });
+    config.target = '7';
+    expect(saveData(data)).toBe(true);
+    const restored = loadData();
+    const canonical = { cardCount: 4, target: '9007199254740993' };
+    expect(restored.settings.gameConfig).toEqual(canonical);
+    expect(restored.activeRun?.config).toEqual(canonical);
+    expect(reconcileInterruptedRun(restored, 10).runs[0].config).toEqual(canonical);
+    expect(finishRun(restored, { id: 'variation', startedAt: 1, endedAt: 10, elapsedMs: 9, outcome: 'won' }).runs[0].config).toEqual(canonical);
+    expect(resetStats(restored).settings.gameConfig).toEqual(canonical);
+  });
+  it('drops explicitly malformed run configs without treating them as standard', () => {
+    const legacy = { id: 'legacy', outcome: 'won', startedAt: 1, endedAt: 2, elapsedMs: 1 };
+    const parsed = parseStoredData({ ...defaultData(), runs: [legacy, { ...legacy, id: 'bad', config: { cardCount: 1, target: '2025' } }, { ...legacy, id: 'null', config: null }], activeRun: { id: 'active', startedAt: 1, config: { cardCount: 8, target: '1e3' } } });
+    expect(parsed?.runs).toEqual([legacy]);
+    expect(parsed?.activeRun).toBeNull();
+    expect(parseStoredData({ ...defaultData(), settings: { playingCardMode: true, gameConfig: { cardCount: 8, target: '-1' } } })).toBeNull();
   });
   it('handles blocked storage for reads and writes', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });

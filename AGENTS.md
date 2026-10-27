@@ -8,13 +8,13 @@ Read `PLAN.md` before starting work. Treat its proposed defaults as provisional 
 
 ## Product
 
-Build a browser game with a starting menu, a play screen, and a statistics screen. A hand contains eight distinct cards drawn from a standard 52-card deck; card values are 1–13. Repeated values are allowed when the underlying cards differ.
+Build a browser game with a starting menu, a play screen, and a statistics screen. The standard game uses eight distinct cards and target 2025. Main-menu settings allow 2–52 cards from the standard deck and a positive integer target within the 4096-bit exact-arithmetic bound. Card values are 1–13; repeated ranks are allowed when the physical cards differ.
 
 Support both interaction orders: first card → operation → second card, and first card → second card → operation. Show the first card with a gold border and the second with a blue border; selection order defines subtraction, division, and exponentiation. A/S/D/F/G select add/subtract/multiply/divide/power. Replace the operands with one result card at a random valid position.
 
 Display numeric values by default. A playing card mode displays exact values 1, 11, 12, and 13 as A, J, Q, and K. All other values retain their numeric representation.
 
-Confirmed rules: winning requires consuming all eight original cards into one value of exactly 2025. Include all five operation buttons, including exponentiation. Use exact fractions with integer exponents for now. Initial hands need not be guaranteed solvable; guaranteed solvable deals are a desired future feature.
+Winning requires consuming every starting card into one exact value equal to the run's configured target. Snapshot configuration at run start; standard and variation statistics must be isolated by card count and canonical target. Include all five operation buttons, including exponentiation. Use exact fractions with integer exponents. Initial hands need not be guaranteed solvable; guaranteed solvable deals are a desired future feature.
 
 Include a Give up button that ends the run and records its elapsed time. Statistics include wins, best winning time, average time of the last 20 wins, success rate, and time until give up. Follow `PLAN.md` for proposed outcome and aggregation definitions; distinguish explicit give-ups from other abandoned runs.
 

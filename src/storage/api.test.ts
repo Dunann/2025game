@@ -13,6 +13,19 @@ describe('profile API client', () => {
     expect(await loadProfile()).toEqual(defaultData());
     expect(fetchMock).toHaveBeenCalledWith('/api/profile', expect.objectContaining({ method: 'GET', credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, signal: expect.any(AbortSignal) }));
   });
+  it('preserves configuration on profile loading and all write payloads', async () => {
+    const config = { cardCount: 4, target: '9007199254740993' };
+    const settings = { playingCardMode: true, gameConfig: config };
+    const active = { id: 'variation', startedAt: 1, config };
+    const record = { ...active, endedAt: 2, elapsedMs: 1, outcome: 'won' as const };
+    fetchMock.mockResolvedValueOnce(respond({ ...defaultData(), settings, activeRun: active, runs: [record] }));
+    const loaded = await loadProfile();
+    expect(loaded.settings).toEqual(settings);
+    expect(loaded.runs[0]).toEqual(record);
+    fetchMock.mockImplementation(async () => respond({ ok: true }));
+    await saveRemoteSettings(settings); await startRemoteRun(active); await finishRemoteRun(record);
+    expect(fetchMock.mock.calls.slice(1).map(([, options]) => JSON.parse(String(options?.body)))).toEqual([settings, active, record]);
+  });
   it('sanitizes malformed profile records before returning data to views', async () => {
     fetchMock.mockResolvedValue(respond({ ...defaultData(), runs: [null, { id: 'bad', outcome: 'won' }], settings: { playingCardMode: 'false' } }));
     expect(await loadProfile()).toEqual(defaultData());
