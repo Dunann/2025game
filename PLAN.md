@@ -1,6 +1,6 @@
 # 2025 game implementation plan
 
-Status: implementation authorized. Initial planning documents were pushed to `origin/main` in commit `46237e3` before this revision. The lead will establish shared contracts and coordinate three workers in the existing repository.
+Status: first draft implemented and validated locally. Initial planning documents were pushed to `origin/main` in commit `46237e3`; working source was pushed in `8ac523e`. The primary agent served as lead with three workers. Public hosting and provider selection remain future work.
 
 ## Intended experience
 
@@ -76,6 +76,8 @@ Use a TypeScript React/Vite browser application with responsive CSS, plus a Node
 - The initial API stores client-submitted personal practice results. Competitive online play later requires server-authoritative deals, move validation, timing, and authentication before enabling rankings.
 - Add database/API integration checks for player isolation, duplicate finishes, interruption handling, malformed input, transactional reset, and persistence. Document environment variables, migrations, local startup, and hosted PostgreSQL setup.
 - Provider choice remains open. Standard PostgreSQL allows a later choice among providers; Supabase is a candidate if managed authentication becomes a priority. No provider account or paid resource is needed for the local implementation.
+- The user explicitly requires no paid database services now. Use the free local backend; do not create paid resources. Revisit available free hosting options when deployment is requested.
+- Acquire a browser Web Lock for the entire document before replaying saves or reconciling server active runs. A second tab shows an actionable message and retry; this prevents it from abandoning a still-live attempt. Same-document StrictMode and hot reload share the acquisition.
 
 | Area | Responsibility |
 | --- | --- |
@@ -170,3 +172,21 @@ Guaranteed solvable deals are a desired future milestone. Evaluate a solver vers
 ## Planning handoff
 
 `AGENTS.md` defines execution boundaries and team coordination. This document defines confirmed product behavior, design direction, implementation sequence, and acceptance criteria. Implementation is authorized; keep this plan updated with integration results and known limitations.
+
+## First-draft implementation results
+
+- Implemented React/TypeScript frontend, exact-fraction game engine, full ordered card interaction, poker-table styling, merge particles, undo, same-hand Restart, New hand, Give up, main menu, display preference, and statistics.
+- Implemented Express API with anonymous HttpOnly sessions, normalized PostgreSQL tables, transactional migrations, disk-persisted local PGlite, and an external PostgreSQL adapter for future hosting. No paid resources were created.
+- Added API-backed profile loading, ordered write queue with retry and per-tab reload recovery, visible save status, interrupted-attempt reconciliation, and a Web Lock to prevent conflicting tabs.
+- Final production build passed, including client and server TypeScript checks. All **70 tests across 7 files** passed, covering arithmetic, storage, statistics, API client, save queue, tab lock, and real HTTP/database integration.
+- Browser checks passed: a full eight-card/seven-merge win, exact fractional division, rejected division by zero with unchanged board and retained selection, one 12-particle burst after a valid merge and none after rejection, undo, cancel/confirm Restart restoring the same hand, cancel/confirm Give up, correct mixed-outcome success rate and give-up duration, record/preference reload persistence, and second-tab protection.
+- At a 320px viewport, the page had no horizontal overflow; all card bounds remained visible without overlap and all five operation buttons exceeded 44px width. Reduced motion behavior was reviewed in CSS; screen-reader behavior was inspected through accessibility state, not a full manual assistive-technology audit.
+- Fixed a fresh-checkout database startup bug by creating missing parent directories, with a disk-persistence regression test.
+- Confirmed the single `npm run dev` command starts both services and that records/preferences survive a full backend restart. Browser reload of an active attempt records one abandonment with unknown duration.
+
+### Remaining scope and limits
+
+- No hosted database/provider instance or public deployment has been created or tested. External PostgreSQL uses the tested SQL schema but still needs a real-provider check when selected.
+- Accounts, cross-device login, competitive score validation, multiplayer, and guaranteed solvable hands remain future work.
+- Personal records use an anonymous browser cookie. Only one app tab can own a session. Unsent API operations survive a same-tab reload when session storage is available; closing the tab can lose unsent operations. Save status makes this visible.
+- Local development and all completed work require no paid database service. See `README.md` for startup and `server/README.md` for database configuration.

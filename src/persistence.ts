@@ -1,6 +1,7 @@
 import { loadProfile } from './storage/api';
 import { reconcileInterruptedRun } from './storage';
 import { createSaveQueue } from './storage/sync';
+import { acquirePlayerTabLock } from './sessionLock';
 import type { SaveStatus } from './storage/sync';
 import type { StoredData } from './types';
 
@@ -20,6 +21,7 @@ export function subscribeToSaves(listener: (status: SaveStatus) => void) {
 let startup: Promise<StoredData> | null = null;
 export function bootstrapProfile(): Promise<StoredData> {
   if (!startup) startup = (async () => {
+    await acquirePlayerTabLock();
     saves.retry();
     if (!await saves.flush()) throw new Error('Pending records could not be saved. Check the server connection and retry.');
     const profile = await loadProfile();

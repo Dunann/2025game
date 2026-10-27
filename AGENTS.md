@@ -56,6 +56,7 @@ Paths are proposals until the lead creates the application. With two workers, co
 - Use semantic buttons, visible focus, accessible names, adequate touch targets, keyboard operation, and reduced motion support.
 - Persist validated records and settings in the backend PostgreSQL database; browser storage is a cache. Record each terminal run outcome once, distinguishing wins, give-ups, and other abandonments. Handle unavailable browser cache and report backend save failures with retry.
 - The user added backend/database scope during implementation. The lead may reassign an available worker to `server/**` and another to the API client while preserving exclusive file ownership. Server-side PGlite is allowed for local development; production uses PostgreSQL via `DATABASE_URL`.
+- No paid resources or provider subscriptions are authorized. Keep local development free. Commit and push meaningful working checkpoints; push the completed first draft, as requested by the user.
 - Avoid adding accounts, leaderboards, a solver, or monetization unless the agreed scope requires them.
 - Keep secrets out of client code. Document build commands and any hosting configuration.
 

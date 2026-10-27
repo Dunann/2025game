@@ -22,7 +22,7 @@ button, a, input { touch-action: manipulation; }
 button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3px solid #f2d18b; outline-offset: 5px; }
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
-h1:focus { outline: none; }
+h1[tabindex="-1"]:focus { outline: none; }
 button { color: inherit; }
 ::selection { background: #dbc084; color: #102f25; }
 .app-shell {
